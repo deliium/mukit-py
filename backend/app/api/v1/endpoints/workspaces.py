@@ -1,15 +1,13 @@
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, Depends
 
 from app.api.deps import get_current_active_user
-from app.core.database import get_db
+from app.api.deps_services import get_workspace_service
 from app.models.user import User
-from app.models.workspace import Workspace as WorkspaceModel
-from app.models.workspace import WorkspaceMember as WorkspaceMemberModel
 from app.schemas.workspace import Workspace, WorkspaceCreate, WorkspaceUpdate
+from app.services.dto import CreateWorkspaceDTO, UpdateWorkspaceDTO
+from app.services.workspace_service import WorkspaceService
 
 router = APIRouter()
 
@@ -18,77 +16,35 @@ router = APIRouter()
 async def create_workspace(
     workspace: WorkspaceCreate,
     current_user: User = Depends(get_current_active_user),
-    db: AsyncSession = Depends(get_db),
+    workspace_service: WorkspaceService = Depends(get_workspace_service),
 ) -> Workspace:
-    # Check if slug is unique
-    result = await db.execute(
-        select(WorkspaceModel).where(WorkspaceModel.slug == workspace.slug),
-    )
-    if result.scalar_one_or_none():
-        raise HTTPException(status_code=400, detail="Workspace slug already exists")
-
-    db_workspace = WorkspaceModel(
+    """Create a new workspace."""
+    dto = CreateWorkspaceDTO(
         name=workspace.name,
         description=workspace.description,
         slug=workspace.slug,
         owner_id=current_user.id,
     )
-
-    db.add(db_workspace)
-    await db.commit()
-    await db.refresh(db_workspace)
-
-    # Add owner as workspace member
-    member = WorkspaceMemberModel(
-        workspace_id=db_workspace.id,
-        user_id=current_user.id,
-        role="owner",
-    )
-    db.add(member)
-    await db.commit()
-
-    return db_workspace  # type: ignore[return-value]
+    return await workspace_service.create_workspace(dto, current_user.id)
 
 
 @router.get("/", response_model=list[Workspace])
 async def get_workspaces(
     current_user: User = Depends(get_current_active_user),
-    db: AsyncSession = Depends(get_db),
+    workspace_service: WorkspaceService = Depends(get_workspace_service),
 ) -> list[Workspace]:
-    # Get workspaces where user is owner or member
-    result = await db.execute(
-        select(WorkspaceModel)
-        .join(WorkspaceMemberModel)
-        .where(WorkspaceMemberModel.user_id == current_user.id),
-    )
-    return result.scalars().all()  # type: ignore[return-value]
+    """Get workspaces where user is a member."""
+    return await workspace_service.get_workspaces(current_user.id)
 
 
 @router.get("/{workspace_id}", response_model=Workspace)
 async def get_workspace(
     workspace_id: uuid.UUID,
     current_user: User = Depends(get_current_active_user),
-    db: AsyncSession = Depends(get_db),
+    workspace_service: WorkspaceService = Depends(get_workspace_service),
 ) -> Workspace:
-    result = await db.execute(
-        select(WorkspaceModel).where(WorkspaceModel.id == workspace_id),
-    )
-    workspace = result.scalar_one_or_none()
-
-    if not workspace:
-        raise HTTPException(status_code=404, detail="Workspace not found")
-
-    # Check if user has access to workspace
-    result = await db.execute(
-        select(WorkspaceMemberModel).where(
-            WorkspaceMemberModel.workspace_id == workspace_id,
-            WorkspaceMemberModel.user_id == current_user.id,
-        ),
-    )
-    if not result.scalar_one_or_none():
-        raise HTTPException(status_code=403, detail="Access denied")
-
-    return workspace  # type: ignore[return-value]
+    """Get workspace by ID."""
+    return await workspace_service.get_workspace(workspace_id, current_user.id)
 
 
 @router.put("/{workspace_id}", response_model=Workspace)
@@ -96,32 +52,12 @@ async def update_workspace(
     workspace_id: uuid.UUID,
     workspace_update: WorkspaceUpdate,
     current_user: User = Depends(get_current_active_user),
-    db: AsyncSession = Depends(get_db),
+    workspace_service: WorkspaceService = Depends(get_workspace_service),
 ) -> Workspace:
-    result = await db.execute(
-        select(WorkspaceModel).where(WorkspaceModel.id == workspace_id),
+    """Update workspace."""
+    dto = UpdateWorkspaceDTO(
+        name=workspace_update.name,
+        description=workspace_update.description,
+        avatar_url=workspace_update.avatar_url,
     )
-    workspace = result.scalar_one_or_none()
-
-    if not workspace:
-        raise HTTPException(status_code=404, detail="Workspace not found")
-
-    # Check if user is owner or admin
-    result = await db.execute(
-        select(WorkspaceMemberModel).where(
-            WorkspaceMemberModel.workspace_id == workspace_id,
-            WorkspaceMemberModel.user_id == current_user.id,
-            WorkspaceMemberModel.role.in_(["owner", "admin"]),
-        ),
-    )
-    if not result.scalar_one_or_none():
-        raise HTTPException(status_code=403, detail="Access denied")
-
-    # Update workspace
-    for field, value in workspace_update.model_dump(exclude_unset=True).items():
-        setattr(workspace, field, value)
-
-    await db.commit()
-    await db.refresh(workspace)
-
-    return workspace  # type: ignore[return-value]
+    return await workspace_service.update_workspace(workspace_id, dto, current_user.id)

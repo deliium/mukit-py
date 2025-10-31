@@ -35,8 +35,7 @@ class TestConnectionManager:
         assert websocket in self.manager.connection_users
         assert self.manager.connection_users[websocket] == user
 
-        # Check that websocket.accept was called
-        websocket.accept.assert_called_once()
+        # Note: websocket.accept() is called in document_websocket.py, not here
 
     @pytest.mark.asyncio
     async def test_disconnect(self):

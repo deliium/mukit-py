@@ -6,6 +6,7 @@ from sqlalchemy import Boolean, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
+from app.schemas.dto import UserReadModel
 
 if TYPE_CHECKING:
     from app.models.comment import Comment
@@ -44,3 +45,20 @@ class User(Base):
     document_versions: Mapped[list[DocumentVersion]] = relationship(
         back_populates="author"
     )
+
+    def to_read_model(self) -> UserReadModel:
+        """Convert User model to UserReadModel."""
+        return UserReadModel(
+            id=self.id,
+            email=self.email,
+            username=self.username,
+            hashed_password=self.hashed_password,
+            first_name=self.first_name,
+            last_name=self.last_name,
+            avatar_url=self.avatar_url,
+            bio=self.bio,
+            is_active=self.is_active,
+            is_verified=self.is_verified,
+            created_at=self.created_at,
+            updated_at=self.updated_at,
+        )

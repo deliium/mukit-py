@@ -3,8 +3,8 @@ import logging
 import uuid
 
 from fastapi import WebSocket, status
-from starlette.websockets import WebSocketState, WebSocketDisconnect
 from sqlalchemy import select
+from starlette.websockets import WebSocketDisconnect, WebSocketState
 
 from app.models.document import Document as DocumentModel
 from app.models.user import User

@@ -68,7 +68,9 @@ const DocumentPage: React.FC = () => {
     saveTimerRef.current = window.setTimeout(async () => {
       try {
         if (!documentId) return;
-        await api.put(`/documents/${documentId}`, { content: lastContentRef.current });
+        await api.put(`/documents/${documentId}`, {
+          content: lastContentRef.current,
+        });
       } catch (e) {
         console.error('Autosave error:', e);
       }

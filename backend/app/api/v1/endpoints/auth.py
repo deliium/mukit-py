@@ -1,74 +1,57 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, Depends
 
 from app.api.deps import get_current_active_user
-from app.core.database import get_db
-from app.core.security import create_access_token, get_password_hash, verify_password
-from app.models.user import User as UserModel
-from app.schemas.user import Token, User, UserCreate, UserLogin, UserPublic
+from app.api.deps_services import get_auth_service
+from app.models.user import User
+from app.schemas.user import Token, UserCreate, UserLogin, UserPublic
+from app.services.auth_service import AuthService
 
 router = APIRouter()
 
 
 @router.post("/register", response_model=UserPublic)
-async def register(user: UserCreate, db: AsyncSession = Depends(get_db)) -> UserPublic:
-    # Check if user already exists
-    result = await db.execute(select(UserModel).where(UserModel.email == user.email))
-    if result.scalar_one_or_none():
-        raise HTTPException(status_code=400, detail="Email already registered")
-
-    # Check if username is already taken
-    result = await db.execute(
-        select(UserModel).where(UserModel.username == user.username)
-    )
-    if result.scalar_one_or_none():
-        raise HTTPException(status_code=400, detail="Username already taken")
-
-    # Create new user
-    hashed_password = get_password_hash(user.password)
-    db_user = UserModel(
+async def register(
+    user: UserCreate,
+    auth_service: AuthService = Depends(get_auth_service),
+) -> UserPublic:
+    """Register a new user."""
+    return await auth_service.register(
         email=user.email,
+        password=user.password,
         username=user.username,
-        hashed_password=hashed_password,
         first_name=user.first_name,
         last_name=user.last_name,
         bio=user.bio,
     )
 
-    db.add(db_user)
-    await db.commit()
-    await db.refresh(db_user)
-
-    return db_user  # type: ignore[return-value]
-
 
 @router.post("/login", response_model=Token)
 async def login(
     user_credentials: UserLogin,
-    db: AsyncSession = Depends(get_db),
+    auth_service: AuthService = Depends(get_auth_service),
 ) -> Token:
-    result = await db.execute(
-        select(UserModel).where(UserModel.email == user_credentials.email),
+    """Login user and get access token."""
+    return await auth_service.login(
+        email=user_credentials.email,
+        password=user_credentials.password,
     )
-    user = result.scalar_one_or_none()
-
-    if not user or not verify_password(
-        user_credentials.password,
-        str(user.hashed_password),
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    access_token = create_access_token(data={"sub": str(user.email)})
-    return {"access_token": access_token, "token_type": "bearer"}  # type: ignore[return-value]
 
 
 @router.get("/me", response_model=UserPublic)
 async def read_users_me(
-    current_user: UserModel = Depends(get_current_active_user),
-) -> UserModel:
-    return current_user
+    current_user: User = Depends(get_current_active_user),
+) -> UserPublic:
+    """Get current user information."""
+    return UserPublic(
+        id=current_user.id,
+        email=current_user.email,
+        username=current_user.username,
+        first_name=current_user.first_name,
+        last_name=current_user.last_name,
+        avatar_url=current_user.avatar_url,
+        bio=current_user.bio,
+        is_active=current_user.is_active,
+        is_verified=current_user.is_verified,
+        created_at=current_user.created_at,
+        updated_at=current_user.updated_at,
+    )

@@ -7,6 +7,7 @@ from sqlalchemy import JSON, Boolean, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
+from app.schemas.dto import DocumentReadModel, DocumentVersionReadModel
 
 if TYPE_CHECKING:
     import uuid
@@ -39,6 +40,21 @@ class Document(Base):
         back_populates="document"
     )
 
+    def to_read_model(self) -> DocumentReadModel:
+        """Convert Document model to DocumentReadModel."""
+        return DocumentReadModel(
+            id=self.id,
+            title=self.title,
+            description=self.description,
+            content=self.content,
+            owner_id=self.owner_id,
+            workspace_id=self.workspace_id,
+            is_public=self.is_public,
+            settings=self.settings,
+            created_at=self.created_at,
+            updated_at=self.updated_at,
+        )
+
 
 class DocumentVersion(Base):
     __tablename__ = "document_versions"
@@ -57,6 +73,20 @@ class DocumentVersion(Base):
     # Relationships
     document: Mapped[Document] = relationship(back_populates="versions")
     author: Mapped[User] = relationship(back_populates="document_versions")
+
+    def to_read_model(self) -> DocumentVersionReadModel:
+        """Convert DocumentVersion model to DocumentVersionReadModel."""
+        return DocumentVersionReadModel(
+            id=self.id,
+            document_id=self.document_id,
+            version_number=self.version_number,
+            content=self.content,
+            content_hash=self.content_hash,
+            author_id=self.author_id,
+            change_description=self.change_description,
+            created_at=self.created_at,
+            updated_at=self.updated_at,
+        )
 
 
 __all__ = [

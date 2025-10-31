@@ -7,6 +7,7 @@ from sqlalchemy import ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
+from app.schemas.dto import WorkspaceMemberReadModel, WorkspaceReadModel
 
 if TYPE_CHECKING:
     from app.models.document import Document
@@ -29,6 +30,19 @@ class Workspace(Base):
     members: Mapped[list[WorkspaceMember]] = relationship(back_populates="workspace")
     documents: Mapped[list[Document]] = relationship(back_populates="workspace")
 
+    def to_read_model(self) -> WorkspaceReadModel:
+        """Convert Workspace model to WorkspaceReadModel."""
+        return WorkspaceReadModel(
+            id=self.id,
+            name=self.name,
+            description=self.description,
+            slug=self.slug,
+            avatar_url=self.avatar_url,
+            owner_id=self.owner_id,
+            created_at=self.created_at,
+            updated_at=self.updated_at,
+        )
+
 
 class WorkspaceMember(Base):
     __tablename__ = "workspace_members"
@@ -44,3 +58,14 @@ class WorkspaceMember(Base):
     # Relationships
     workspace: Mapped[Workspace] = relationship(back_populates="members")
     user: Mapped[User] = relationship(back_populates="workspace_memberships")
+
+    def to_read_model(self) -> WorkspaceMemberReadModel:
+        """Convert WorkspaceMember model to WorkspaceMemberReadModel."""
+        return WorkspaceMemberReadModel(
+            id=self.id,
+            workspace_id=self.workspace_id,
+            user_id=self.user_id,
+            role=self.role,
+            created_at=self.created_at,
+            updated_at=self.updated_at,
+        )
