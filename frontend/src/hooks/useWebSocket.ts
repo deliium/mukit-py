@@ -36,6 +36,33 @@ export const useWebSocket = ({
   const [connected, setConnected] = useState(false);
   const [users, setUsers] = useState<any[]>([]);
   const socketRef = useRef<WebSocket | null>(null);
+  const handlersRef = useRef({
+    onContentChange,
+    onCursorPosition,
+    onSelectionChange,
+    onUserJoined,
+    onUserLeft,
+    onDocumentUsers,
+  });
+
+  // Keep latest handlers without re-creating the socket
+  useEffect(() => {
+    handlersRef.current = {
+      onContentChange,
+      onCursorPosition,
+      onSelectionChange,
+      onUserJoined,
+      onUserLeft,
+      onDocumentUsers,
+    };
+  }, [
+    onContentChange,
+    onCursorPosition,
+    onSelectionChange,
+    onUserJoined,
+    onUserLeft,
+    onDocumentUsers,
+  ]);
 
   useEffect(() => {
     if (!documentId || !token) {
@@ -53,6 +80,19 @@ export const useWebSocket = ({
     const wsUrl_full = `${wsPath}/api/v1/documents/${documentId}/ws?token=${token}`;
 
     console.log('WebSocket: Attempting to connect to', wsUrl_full);
+    // Avoid duplicate sockets in React Strict Mode/dev HMR
+    if (
+      socketRef.current &&
+      socketRef.current.url === wsUrl_full &&
+      (socketRef.current.readyState === WebSocket.OPEN ||
+        socketRef.current.readyState === WebSocket.CONNECTING)
+    ) {
+      console.log('WebSocket: Reuse existing connection');
+      setSocket(socketRef.current);
+      setConnected(socketRef.current.readyState === WebSocket.OPEN);
+      return;
+    }
+
     const newSocket = new WebSocket(wsUrl_full);
 
     newSocket.onopen = () => {
@@ -75,34 +115,34 @@ export const useWebSocket = ({
 
         switch (data.type) {
           case 'content_change':
-            if (onContentChange) {
-              onContentChange(data.content, data.user);
+            if (handlersRef.current.onContentChange) {
+              handlersRef.current.onContentChange(data.content, data.user);
             }
             break;
           case 'cursor_position':
-            if (onCursorPosition) {
-              onCursorPosition(data.position, data.user);
+            if (handlersRef.current.onCursorPosition) {
+              handlersRef.current.onCursorPosition(data.position, data.user);
             }
             break;
           case 'selection_change':
-            if (onSelectionChange) {
-              onSelectionChange(data.selection, data.user);
+            if (handlersRef.current.onSelectionChange) {
+              handlersRef.current.onSelectionChange(data.selection, data.user);
             }
             break;
           case 'user_joined':
-            if (onUserJoined) {
-              onUserJoined(data.user);
+            if (handlersRef.current.onUserJoined) {
+              handlersRef.current.onUserJoined(data.user);
             }
             break;
           case 'user_left':
-            if (onUserLeft) {
-              onUserLeft(data.user);
+            if (handlersRef.current.onUserLeft) {
+              handlersRef.current.onUserLeft(data.user);
             }
             break;
           case 'document_users':
             setUsers(data.users);
-            if (onDocumentUsers) {
-              onDocumentUsers(data.users);
+            if (handlersRef.current.onDocumentUsers) {
+              handlersRef.current.onDocumentUsers(data.users);
             }
             break;
           default:
@@ -120,18 +160,12 @@ export const useWebSocket = ({
     socketRef.current = newSocket;
 
     return () => {
-      newSocket.close();
+      // Only close if this cleanup corresponds to the active socket
+      if (socketRef.current === newSocket) {
+        newSocket.close();
+      }
     };
-  }, [
-    documentId,
-    token,
-    onContentChange,
-    onCursorPosition,
-    onSelectionChange,
-    onUserJoined,
-    onUserLeft,
-    onDocumentUsers,
-  ]);
+  }, [documentId, token]);
 
   const sendContentChange = (content: any) => {
     if (socket && connected) {

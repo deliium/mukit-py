@@ -1,6 +1,7 @@
 import json
 
 from fastapi import WebSocket
+from starlette.websockets import WebSocketDisconnect
 
 
 class ConnectionManager:
@@ -16,8 +17,6 @@ class ConnectionManager:
         document_id: str,
         user: dict[str, str],
     ) -> None:
-        await websocket.accept()
-
         if document_id not in self.active_connections:
             self.active_connections[document_id] = []
 
@@ -62,7 +61,17 @@ class ConnectionManager:
         message: dict[str, str | dict[str, str] | list[dict[str, str]]],
         websocket: WebSocket,
     ) -> None:
-        await websocket.send_text(json.dumps(message))
+        try:
+            await websocket.send_text(json.dumps(message))
+        except WebSocketDisconnect:
+            # Client disconnected; cleanup
+            for doc_id, conns in list(self.active_connections.items()):
+                if websocket in conns:
+                    conns.remove(websocket)
+                    if not conns:
+                        del self.active_connections[doc_id]
+            if websocket in self.connection_users:
+                del self.connection_users[websocket]
 
     async def broadcast_to_document(
         self,
@@ -75,7 +84,7 @@ class ConnectionManager:
                 if connection != exclude_websocket:
                     try:
                         await connection.send_text(json.dumps(message))
-                    except Exception:
+                    except WebSocketDisconnect:
                         # Remove broken connections
                         if connection in self.active_connections[document_id]:
                             self.active_connections[document_id].remove(connection)

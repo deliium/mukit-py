@@ -6,13 +6,13 @@ from app.api.deps import get_current_active_user
 from app.core.database import get_db
 from app.core.security import create_access_token, get_password_hash, verify_password
 from app.models.user import User as UserModel
-from app.schemas.user import Token, User, UserCreate, UserLogin
+from app.schemas.user import Token, User, UserCreate, UserLogin, UserPublic
 
 router = APIRouter()
 
 
-@router.post("/register", response_model=User)
-async def register(user: UserCreate, db: AsyncSession = Depends(get_db)) -> User:
+@router.post("/register", response_model=UserPublic)
+async def register(user: UserCreate, db: AsyncSession = Depends(get_db)) -> UserPublic:
     # Check if user already exists
     result = await db.execute(select(UserModel).where(UserModel.email == user.email))
     if result.scalar_one_or_none():
@@ -67,7 +67,7 @@ async def login(
     return {"access_token": access_token, "token_type": "bearer"}  # type: ignore[return-value]
 
 
-@router.get("/me", response_model=User)
+@router.get("/me", response_model=UserPublic)
 async def read_users_me(
     current_user: UserModel = Depends(get_current_active_user),
 ) -> UserModel:

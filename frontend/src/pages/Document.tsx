@@ -1,14 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { useWebSocket } from '../hooks/useWebSocket';
-import MonacoEditor from '@monaco-editor/react';
+import ProseMirrorEditor from '../components/ProseMirrorEditor';
 import { Document } from '../types';
 // import { useAuth } from '../contexts/AuthContext';
 import { api } from '../services/api';
 
 const DocumentPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const [content, setContent] = useState('');
+  const [content, setContent] = useState<object | string>('');
   const [document, setDocument] = useState<Document | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -33,13 +33,7 @@ const DocumentPage: React.FC = () => {
         setDocument(docData);
 
         // Set initial content
-        if (docData.content) {
-          setContent(
-            typeof docData.content === 'string'
-              ? docData.content
-              : JSON.stringify(docData.content)
-          );
-        }
+        if (docData.content) setContent(docData.content);
 
         console.log('Document loaded:', docData);
       } catch (error) {
@@ -61,12 +55,24 @@ const DocumentPage: React.FC = () => {
     },
   });
 
-  const handleContentChange = (value: string | undefined) => {
-    if (value !== undefined) {
-      setContent(value);
-      // Send update to other users
-      sendContentChange(value);
+  // Debounced autosave
+  const saveTimerRef = useRef<number | null>(null);
+  const lastContentRef = useRef<object | string>('');
+
+  const handleContentChange = (json: object) => {
+    sendContentChange(json);
+    lastContentRef.current = json;
+    if (saveTimerRef.current) {
+      window.clearTimeout(saveTimerRef.current);
     }
+    saveTimerRef.current = window.setTimeout(async () => {
+      try {
+        if (!documentId) return;
+        await api.put(`/documents/${documentId}`, { content: lastContentRef.current });
+      } catch (e) {
+        console.error('Autosave error:', e);
+      }
+    }, 600);
   };
 
   return (
@@ -93,21 +99,10 @@ const DocumentPage: React.FC = () => {
             <div className='text-gray-500'>Loading document...</div>
           </div>
         ) : (
-          <MonacoEditor
-            height='100%'
-            language='markdown'
+          <ProseMirrorEditor
             value={content}
             onChange={handleContentChange}
-            options={{
-              minimap: { enabled: false },
-              wordWrap: 'on',
-              lineNumbers: 'on',
-              folding: true,
-              lineDecorationsWidth: 0,
-              lineNumbersMinChars: 0,
-              scrollBeyondLastLine: false,
-              automaticLayout: true,
-            }}
+            className='h-full'
           />
         )}
       </div>

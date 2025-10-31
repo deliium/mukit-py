@@ -1,4 +1,5 @@
 from datetime import datetime
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
@@ -8,8 +9,8 @@ class CommentThreadBase(BaseModel):
 
 
 class CommentThreadCreate(CommentThreadBase):
-    document_id: int
-    block_id: int | None = None
+    document_id: UUID
+    block_id: UUID | None = None
 
 
 class CommentThreadUpdate(BaseModel):
@@ -17,7 +18,7 @@ class CommentThreadUpdate(BaseModel):
 
 
 class CommentThreadInDB(CommentThreadBase):
-    id: int
+    id: UUID
     document_id: int
     block_id: int | None = None
     is_resolved: bool
@@ -36,8 +37,8 @@ class CommentBase(BaseModel):
 
 
 class CommentCreate(CommentBase):
-    thread_id: int
-    parent_id: int | None = None
+    thread_id: UUID
+    parent_id: UUID | None = None
 
 
 class CommentUpdate(BaseModel):
@@ -45,10 +46,10 @@ class CommentUpdate(BaseModel):
 
 
 class CommentInDB(CommentBase):
-    id: int
-    thread_id: int
-    author_id: int
-    parent_id: int | None = None
+    id: UUID
+    thread_id: UUID
+    author_id: UUID
+    parent_id: UUID | None = None
     is_edited: bool
     created_at: datetime
     updated_at: datetime | None = None

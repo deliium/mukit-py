@@ -43,6 +43,17 @@ class User(UserInDB):
     pass
 
 
+class UserPublic(UserBase):
+    id: uuid.UUID
+    avatar_url: str | None = None
+    is_active: bool
+    is_verified: bool
+    created_at: datetime
+    updated_at: datetime | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class UserLogin(BaseModel):
     email: EmailStr
     password: str

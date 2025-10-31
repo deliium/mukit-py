@@ -45,6 +45,8 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
     )
 
     async with test_engine.begin() as conn:
+        # Ensure a clean schema each time to avoid legacy column types
+        await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
 
     async with TestSessionLocal() as session:

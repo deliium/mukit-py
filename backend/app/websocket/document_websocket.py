@@ -3,6 +3,7 @@ import logging
 import uuid
 
 from fastapi import WebSocket, status
+from starlette.websockets import WebSocketState, WebSocketDisconnect
 from sqlalchemy import select
 
 from app.models.document import Document as DocumentModel
@@ -25,13 +26,16 @@ async def websocket_endpoint(
 
     # Verify user authentication
     try:
+        # Accept as early as possible to avoid reads before accept
+        await websocket.accept()
         from app.core.database import get_db
         from app.core.security import verify_token
+        from app.models.workspace import WorkspaceMember as WorkspaceMemberModel
 
         email = verify_token(token)
         logger.info("Token verification result: email=%s", email)
         if not email:
-            await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+            await _safe_close(websocket, status.WS_1008_POLICY_VIOLATION)
             return
 
         # Get database session
@@ -41,7 +45,7 @@ async def websocket_endpoint(
             user = result.scalar_one_or_none()
             logger.info("User lookup result: %s", user)
             if not user:
-                await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+                await _safe_close(websocket, status.WS_1008_POLICY_VIOLATION)
                 return
 
             # Check if document exists and user has access
@@ -51,18 +55,28 @@ async def websocket_endpoint(
             document = doc_result.scalar_one_or_none()
             logger.info("Document lookup result: %s", document)
             if not document:
-                await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+                await _safe_close(websocket, status.WS_1008_POLICY_VIOLATION)
                 return
 
-            # Check permissions (simplified - in real app, check Permission model)
+            # Check permissions: owner, public, or workspace member
             logger.info(
-                "Permission check: document.owner_id=%s, user.id=%s, is_public=%s",
+                "Permission check: document.owner_id=%s, user.id=%s, is_public=%s, workspace_id=%s",
                 document.owner_id,
                 user.id,
                 document.is_public,
+                document.workspace_id,
             )
-            if document.owner_id != user.id and not document.is_public:
-                await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+            has_access = document.is_public or document.owner_id == user.id
+            if not has_access and document.workspace_id:
+                wm_result = await db.execute(
+                    select(WorkspaceMemberModel).where(
+                        WorkspaceMemberModel.workspace_id == document.workspace_id,
+                        WorkspaceMemberModel.user_id == user.id,
+                    )
+                )
+                has_access = wm_result.scalar_one_or_none() is not None
+            if not has_access:
+                await _safe_close(websocket, status.WS_1008_POLICY_VIOLATION)
                 return
 
             # Connect to document room
@@ -85,7 +99,14 @@ async def websocket_endpoint(
 
             try:
                 while True:
-                    data = await websocket.receive_text()
+                    # break if socket already closed
+                    if websocket.application_state is not WebSocketState.CONNECTED:
+                        break
+                    try:
+                        data = await websocket.receive_text()
+                    except (WebSocketDisconnect, RuntimeError):
+                        # client closed connection or read on closed socket
+                        break
                     message = json.loads(data)
 
                     # Handle different message types
@@ -126,12 +147,25 @@ async def websocket_endpoint(
                             exclude_websocket=websocket,
                         )
 
-            except Exception as e:
-                logger.error("WebSocket error: %s", e)
+            except Exception:
+                logger.exception("WebSocket error during message loop")
             finally:
                 await manager.disconnect(websocket, str(document_id))
             break
 
-    except Exception as e:
-        logger.error("WebSocket connection error: %s", e)
-        await websocket.close()
+    except Exception:
+        logger.exception("WebSocket connection error before/after accept")
+        await _safe_close(websocket)
+
+
+async def _safe_close(websocket: WebSocket, code: int | None = None) -> None:
+    try:
+        # Avoid sending close twice
+        if websocket.application_state is WebSocketState.CONNECTED:
+            if code is not None:
+                await websocket.close(code=code)
+            else:
+                await websocket.close()
+    except RuntimeError:
+        # Already closed or close frame sent
+        pass

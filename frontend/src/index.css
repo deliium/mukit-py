@@ -4,6 +4,23 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Ensure ProseMirror renders whitespace properly */
+.prosemirror-editor .ProseMirror {
+  white-space: pre-wrap;
+}
+
+/* Make editable area height match container */
+.pm-container {
+  min-height: 400px; /* allow growth beyond 400px */
+}
+.pm-container .ProseMirror {
+  width: 100%;
+  min-height: inherit; /* match container min height */
+  height: auto; /* grow with content */
+  box-sizing: border-box;
+  outline: none; /* avoid changing outline width on wraps */
+}
+
 @layer base {
   html {
     font-family: 'Inter', system-ui, sans-serif;

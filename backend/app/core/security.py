@@ -21,14 +21,14 @@ def create_access_token(
     data: dict[str, str],
     expires_delta: timedelta | None = None,
 ) -> str:
-    to_encode = data.copy()
+    to_encode: dict[str, object] = data.copy()
     if expires_delta:
         expire = datetime.now(tz=UTC) + expires_delta
     else:
         expire = datetime.now(tz=UTC) + timedelta(
             minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES,
         )
-    to_encode.update({"exp": str(int(expire.timestamp()))})
+    to_encode.update({"exp": int(expire.timestamp())})
     return str(
         jwt.encode(
             to_encode,
