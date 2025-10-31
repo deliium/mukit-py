@@ -128,3 +128,13 @@ class DocumentRepository:
         )
         versions = result.scalars().all()
         return [version.to_read_model() for version in versions]
+
+    async def get_public_documents(self) -> list[DocumentReadModel]:
+        """Get all public documents."""
+        result = await self.db.execute(
+            select(Document)
+            .where(Document.is_public)
+            .order_by(Document.created_at.desc())
+        )
+        documents = result.scalars().all()
+        return [doc.to_read_model() for doc in documents]

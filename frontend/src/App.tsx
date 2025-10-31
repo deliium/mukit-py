@@ -9,6 +9,7 @@ import { Register } from './pages/Register';
 import { Dashboard } from './pages/Dashboard';
 import WorkspacePage from './pages/Workspace';
 import DocumentPage from './pages/Document';
+import PublicDocumentsPage from './pages/PublicDocuments';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
 const queryClient = new QueryClient({
@@ -48,6 +49,10 @@ function App() {
                         <Route
                           path='/document/:id'
                           element={<DocumentPage />}
+                        />
+                        <Route
+                          path='/public-documents'
+                          element={<PublicDocumentsPage />}
                         />
                       </Routes>
                     </Layout>

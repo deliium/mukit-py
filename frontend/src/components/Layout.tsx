@@ -9,6 +9,7 @@ import {
   UserIcon,
   Cog6ToothIcon,
   ArrowRightOnRectangleIcon,
+  GlobeAltIcon,
 } from '@heroicons/react/24/outline';
 
 interface LayoutProps {
@@ -28,6 +29,11 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const navigation = [
     { name: 'Dashboard', href: '/', icon: DocumentTextIcon },
     { name: 'Workspaces', href: '/workspaces', icon: FolderIcon },
+    {
+      name: 'Public Documents',
+      href: '/public-documents',
+      icon: GlobeAltIcon,
+    },
   ];
 
   return (

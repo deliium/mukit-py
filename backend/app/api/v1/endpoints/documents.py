@@ -47,6 +47,14 @@ async def get_documents(
     return await document_service.get_documents(filter_dto, current_user.id)
 
 
+@router.get("/public", response_model=list[Document])
+async def get_public_documents(
+    document_service: DocumentService = Depends(get_document_service),
+) -> list[Document]:
+    """Get all public documents."""
+    return await document_service.get_public_documents()
+
+
 @router.get("/{document_id}", response_model=Document)
 async def get_document(
     document_id: uuid.UUID,

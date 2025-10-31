@@ -89,6 +89,26 @@ class DocumentService:
             for doc in documents_read
         ]
 
+    async def get_public_documents(self) -> list[Document]:
+        """Get all public documents."""
+        documents_read = await self.document_repository.get_public_documents()
+
+        return [
+            Document(
+                id=doc.id,
+                title=doc.title,
+                description=doc.description,
+                content=doc.content,
+                owner_id=doc.owner_id,
+                workspace_id=doc.workspace_id,
+                is_public=doc.is_public,
+                settings=doc.settings,
+                created_at=doc.created_at,
+                updated_at=doc.updated_at,
+            )
+            for doc in documents_read
+        ]
+
     async def get_document(
         self, document_id: uuid.UUID, current_user_id: uuid.UUID
     ) -> Document:
