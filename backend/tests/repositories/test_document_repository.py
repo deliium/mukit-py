@@ -159,3 +159,4 @@ class TestDocumentRepository:
         # Private document should not be in the list
         assert not any(doc.id == test_document.id for doc in public_docs)
 
+

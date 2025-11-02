@@ -94,3 +94,4 @@ class TestUserRepository:
         assert await repository.exists_by_username(test_user.username) is True
         assert await repository.exists_by_username("nonexistentuser") is False
 
+

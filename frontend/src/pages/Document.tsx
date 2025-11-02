@@ -5,6 +5,9 @@ import {
   XMarkIcon,
   GlobeAltIcon,
   LockClosedIcon,
+  PencilIcon,
+  CheckIcon,
+  XMarkIcon as XIcon,
 } from '@heroicons/react/24/outline';
 import { useWebSocket } from '../hooks/useWebSocket';
 import ProseMirrorEditor from '../components/ProseMirrorEditor';
@@ -21,6 +24,9 @@ const DocumentPage: React.FC = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [isPublic, setIsPublic] = useState(false);
   const [updating, setUpdating] = useState(false);
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [editedTitle, setEditedTitle] = useState('');
+  const titleInputRef = useRef<HTMLInputElement>(null);
 
   // WebSocket connection for real-time collaboration
   const documentId = id || '';
@@ -110,14 +116,110 @@ const DocumentPage: React.FC = () => {
     }
   };
 
+  const handleTitleClick = () => {
+    if (!isOwner || loading || !document) return;
+    setEditedTitle(document.title);
+    setIsEditingTitle(true);
+    // Focus input after state update
+    setTimeout(() => {
+      titleInputRef.current?.focus();
+      titleInputRef.current?.select();
+    }, 0);
+  };
+
+  const handleTitleSave = async () => {
+    if (!documentId || !editedTitle.trim() || updating) return;
+
+    const newTitle = editedTitle.trim();
+    if (newTitle === document?.title) {
+      setIsEditingTitle(false);
+      return;
+    }
+
+    try {
+      setUpdating(true);
+      const response = await api.put(`/documents/${documentId}`, {
+        title: newTitle,
+      });
+      setDocument(response.data);
+      setIsEditingTitle(false);
+    } catch (error: any) {
+      console.error('Error updating title:', error);
+      alert(error.response?.data?.detail || 'Failed to update title');
+      // Reset to original title on error
+      setEditedTitle(document?.title || '');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleTitleCancel = () => {
+    setEditedTitle(document?.title || '');
+    setIsEditingTitle(false);
+  };
+
+  const handleTitleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleTitleSave();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      handleTitleCancel();
+    }
+  };
+
   return (
     <div className='h-screen flex flex-col'>
       <div className='bg-white border-b px-6 py-4'>
         <div className='flex items-center justify-between'>
-          <div className='flex items-center space-x-3'>
-            <h1 className='text-2xl font-bold text-gray-900'>
-              {loading ? 'Loading...' : document?.title || 'Untitled Document'}
-            </h1>
+          <div className='flex items-center space-x-3 flex-1 min-w-0'>
+            {isEditingTitle && isOwner ? (
+              <div className='flex items-center space-x-2 flex-1 min-w-0'>
+                <input
+                  ref={titleInputRef}
+                  type='text'
+                  value={editedTitle}
+                  onChange={e => setEditedTitle(e.target.value)}
+                  onKeyDown={handleTitleKeyDown}
+                  disabled={updating}
+                  className='text-2xl font-bold text-gray-900 bg-transparent border-b-2 border-primary-500 focus:outline-none focus:border-primary-600 flex-1 min-w-0'
+                  maxLength={255}
+                />
+                <button
+                  onClick={handleTitleSave}
+                  disabled={updating}
+                  className='p-1.5 text-green-600 hover:text-green-700 hover:bg-green-50 rounded transition-colors'
+                  title='Save title'
+                >
+                  <CheckIcon className='h-5 w-5' />
+                </button>
+                <button
+                  onClick={handleTitleCancel}
+                  disabled={updating}
+                  className='p-1.5 text-red-600 hover:text-red-700 hover:bg-red-50 rounded transition-colors'
+                  title='Cancel editing'
+                >
+                  <XIcon className='h-5 w-5' />
+                </button>
+              </div>
+            ) : (
+              <div
+                className={`flex items-center space-x-2 flex-1 min-w-0 ${
+                  isOwner && !loading ? 'group cursor-pointer' : ''
+                }`}
+                onClick={handleTitleClick}
+                title={isOwner && !loading ? 'Click to edit title' : ''}
+              >
+                <h1 className='text-2xl font-bold text-gray-900 truncate'>
+                  {loading
+                    ? 'Loading...'
+                    : document?.title || 'Untitled Document'}
+                </h1>
+                {isOwner && !loading && (
+                  <PencilIcon className='h-4 w-4 text-gray-400 group-hover:text-gray-600 transition-colors flex-shrink-0' />
+                )}
+              </div>
+            )}
             {/* Public/Private indicator */}
             {!loading && (
               <div
