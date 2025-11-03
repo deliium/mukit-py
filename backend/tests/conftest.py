@@ -166,3 +166,110 @@ async def auth_headers(
     )
     token = response.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
+
+
+@pytest_asyncio.fixture
+async def test_comment_thread(
+    db_session, test_user, test_document
+):
+    """Create a test comment thread."""
+    from app.models.comment import CommentThread
+
+    thread = CommentThread(
+        id=uuid.uuid4(),
+        document_id=test_document.id,
+        position="pos:10",
+        is_resolved=False,
+    )
+    db_session.add(thread)
+    await db_session.commit()
+    await db_session.refresh(thread)
+    return thread
+
+
+@pytest_asyncio.fixture
+async def test_comment(
+    db_session, test_user, test_comment_thread
+):
+    """Create a test comment."""
+    from app.models.comment import Comment
+
+    comment = Comment(
+        id=uuid.uuid4(),
+        thread_id=test_comment_thread.id,
+        author_id=test_user.id,
+        content="Test comment content",
+        is_edited=False,
+    )
+    db_session.add(comment)
+    await db_session.commit()
+    await db_session.refresh(comment)
+    return comment
+
+
+@pytest_asyncio.fixture
+async def test_comment_other_user(
+    db_session, test_user, test_comment_thread
+):
+    """Create a comment by another user."""
+    from app.models.comment import Comment
+    from app.models.user import User as UserModel
+
+    # Create another user
+    other_user = UserModel(
+        id=uuid.uuid4(),
+        email="other@example.com",
+        username="otheruser",
+        hashed_password="hashed",
+        is_active=True,
+        is_verified=True,
+    )
+    db_session.add(other_user)
+    await db_session.commit()
+
+    # Create comment by other user
+    comment = Comment(
+        id=uuid.uuid4(),
+        thread_id=test_comment_thread.id,
+        author_id=other_user.id,
+        content="Comment by other user",
+        is_edited=False,
+    )
+    db_session.add(comment)
+    await db_session.commit()
+    await db_session.refresh(comment)
+    return comment
+
+
+@pytest_asyncio.fixture
+async def test_document_private(
+    db_session, test_user
+):
+    """Create a private document owned by another user."""
+    from app.models.document import Document as DocumentModel
+    from app.models.user import User as UserModel
+
+    # Create another user
+    other_user = UserModel(
+        id=uuid.uuid4(),
+        email="other@example.com",
+        username="otheruser",
+        hashed_password="hashed",
+        is_active=True,
+        is_verified=True,
+    )
+    db_session.add(other_user)
+    await db_session.commit()
+
+    # Create private document by other user
+    document = DocumentModel(
+        id=uuid.uuid4(),
+        title="Private Document",
+        owner_id=other_user.id,
+        is_public=False,
+        content={"blocks": []},
+    )
+    db_session.add(document)
+    await db_session.commit()
+    await db_session.refresh(document)
+    return document

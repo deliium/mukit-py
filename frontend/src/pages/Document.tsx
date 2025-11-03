@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import {
   Cog6ToothIcon,
@@ -8,9 +8,14 @@ import {
   PencilIcon,
   CheckIcon,
   XMarkIcon as XIcon,
+  ChatBubbleLeftRightIcon,
 } from '@heroicons/react/24/outline';
 import { useWebSocket } from '../hooks/useWebSocket';
-import ProseMirrorEditor from '../components/ProseMirrorEditor';
+import ProseMirrorEditor, {
+  ProseMirrorEditorRef,
+} from '../components/ProseMirrorEditor';
+import CommentPanel, { CommentPanelRef } from '../components/CommentPanel';
+import CommentQuickCreate from '../components/CommentQuickCreate';
 import { Document } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../services/api';
@@ -27,20 +32,41 @@ const DocumentPage: React.FC = () => {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editedTitle, setEditedTitle] = useState('');
   const titleInputRef = useRef<HTMLInputElement>(null);
+  const [showComments, setShowComments] = useState(false);
+  const commentPanelRef = useRef<CommentPanelRef | null>(null);
+  const [commentThreads, setCommentThreads] = useState<
+    Array<{ id: string; position: string | null; is_resolved: boolean }>
+  >([]);
+  const [commentPosition, setCommentPosition] = useState<{
+    pos: number;
+    x: number;
+    y: number;
+  } | null>(null);
+  const editorRef = useRef<ProseMirrorEditorRef | null>(null);
 
   // WebSocket connection for real-time collaboration
   const documentId = id || '';
   const token = localStorage.getItem('token') || '';
 
+  // Refs for content tracking to prevent overwriting local changes
+  const saveTimerRef = useRef<number | null>(null);
+  const lastContentRef = useRef<object | string>('');
+  const lastSentContentRef = useRef<object | string>('');
+  const currentContentRef = useRef<object | string>('');
+  const isLocalEditRef = useRef(false);
+
   // Check if current user is the document owner
   const isOwner = user && document && user.id === document.owner_id;
 
-  console.log('Document: Rendering with', {
-    documentId,
-    token: token ? 'present' : 'missing',
-  });
+  // Only log in development mode, not in tests
+  if (import.meta.env.MODE !== 'test') {
+    console.log('Document: Rendering with', {
+      documentId,
+      token: token ? 'present' : 'missing',
+    });
+  }
 
-  // Load document data
+  // Load document data and comment threads
   useEffect(() => {
     const loadDocument = async () => {
       if (!documentId) return;
@@ -53,9 +79,33 @@ const DocumentPage: React.FC = () => {
         setIsPublic(docData.is_public || false);
 
         // Set initial content
-        if (docData.content) setContent(docData.content);
+        if (docData.content) {
+          setContent(docData.content);
+          currentContentRef.current = docData.content;
+          lastContentRef.current = docData.content;
+          lastSentContentRef.current = docData.content;
+        }
 
-        console.log('Document loaded:', docData);
+        // Load comment threads
+        try {
+          const threadsResponse = await api.get(
+            `/comments/documents/${documentId}/threads`
+          );
+          setCommentThreads(
+            threadsResponse.data.map((t: any) => ({
+              id: t.id,
+              position: t.position,
+              is_resolved: t.is_resolved,
+            }))
+          );
+        } catch (error) {
+          console.error('Error loading comment threads:', error);
+        }
+
+        // Only log in development mode, not in tests
+        if (import.meta.env.MODE !== 'test') {
+          console.log('Document loaded:', docData);
+        }
       } catch (error) {
         console.error('Error loading document:', error);
       } finally {
@@ -69,19 +119,60 @@ const DocumentPage: React.FC = () => {
   const { sendContentChange, connected } = useWebSocket({
     documentId,
     token,
-    onContentChange: (newContent: any) => {
-      console.log('Document: Content changed via WebSocket', newContent);
+    onContentChange: (newContent: any, user?: any) => {
+      // Only log in development mode, not in tests
+      if (import.meta.env.MODE !== 'test') {
+        console.log(
+          'Document: Content changed via WebSocket',
+          newContent,
+          user
+        );
+      }
+
+      // If we're in the middle of a local edit, ignore WebSocket updates
+      // (they might be stale or echo back)
+      if (isLocalEditRef.current) {
+        if (import.meta.env.MODE !== 'test') {
+          console.log(
+            'Document: Ignoring WebSocket update (local edit in progress)'
+          );
+        }
+        return;
+      }
+
+      // Compare with current content in editor
+      const currentContentStr = JSON.stringify(currentContentRef.current);
+      const newContentStr = JSON.stringify(newContent);
+
+      // Only update if content is actually different
+      if (currentContentStr === newContentStr) {
+        if (import.meta.env.MODE !== 'test') {
+          console.log(
+            'Document: Ignoring WebSocket update (same as current content)'
+          );
+        }
+        return;
+      }
+
+      // Update content from WebSocket (this is a real update from another user)
       setContent(newContent);
+      currentContentRef.current = newContent;
     },
   });
 
-  // Debounced autosave
-  const saveTimerRef = useRef<number | null>(null);
-  const lastContentRef = useRef<object | string>('');
-
+  // Debounced autosave handler
   const handleContentChange = (json: object) => {
-    sendContentChange(json);
+    // Mark that we're doing a local edit
+    isLocalEditRef.current = true;
+
+    // Update current content immediately
+    currentContentRef.current = json;
     lastContentRef.current = json;
+
+    // Send via WebSocket for real-time collaboration
+    sendContentChange(json);
+
+    // Save to server with debounce
     if (saveTimerRef.current) {
       window.clearTimeout(saveTimerRef.current);
     }
@@ -91,8 +182,16 @@ const DocumentPage: React.FC = () => {
         await api.put(`/documents/${documentId}`, {
           content: lastContentRef.current,
         });
+        // Only update lastSentContentRef after successful save
+        lastSentContentRef.current = lastContentRef.current;
+        // Clear local edit flag after save
+        isLocalEditRef.current = false;
       } catch (e) {
         console.error('Autosave error:', e);
+        // Clear flag even on error after a delay
+        setTimeout(() => {
+          isLocalEditRef.current = false;
+        }, 1000);
       }
     }, 600);
   };
@@ -168,6 +267,153 @@ const DocumentPage: React.FC = () => {
     }
   };
 
+  const handleCommentClick = useCallback(
+    async (position: number, coords: { x: number; y: number }) => {
+      if (!documentId || !editorRef.current) {
+        return;
+      }
+
+      // Get current content from editor immediately
+      const editorContent = editorRef.current.getContent();
+      if (!editorContent) {
+        // No content to save, just show comment dialog
+        setCommentPosition({ pos: position, x: coords.x, y: coords.y });
+        return;
+      }
+
+      try {
+        // Mark that we're saving - this will prevent WebSocket from overwriting
+        isLocalEditRef.current = true;
+
+        // Clear any pending autosave timer
+        if (saveTimerRef.current) {
+          window.clearTimeout(saveTimerRef.current);
+          saveTimerRef.current = null;
+        }
+
+        // Update refs with current editor content
+        currentContentRef.current = editorContent;
+
+        // Save content immediately and wait for it to complete
+        await api.put(`/documents/${documentId}`, {
+          content: editorContent,
+        });
+
+        // Update refs after successful save
+        lastContentRef.current = editorContent;
+        lastSentContentRef.current = editorContent;
+
+        // Send content change via WebSocket
+        sendContentChange(editorContent);
+
+        // Update content state to match what we just saved
+        setContent(editorContent);
+
+        // Clear local edit flag after a short delay to allow WebSocket echo to be filtered
+        setTimeout(() => {
+          isLocalEditRef.current = false;
+        }, 100);
+
+        // Now show comment dialog
+        setCommentPosition({ pos: position, x: coords.x, y: coords.y });
+      } catch (error) {
+        console.error('Error saving content before comment:', error);
+        // Still show comment dialog even if save failed
+        setCommentPosition({ pos: position, x: coords.x, y: coords.y });
+        isLocalEditRef.current = false;
+      }
+    },
+    [documentId, sendContentChange]
+  );
+
+  const handleMarkerClick = useCallback(
+    (threadId: string) => {
+      // Open comment panel if closed
+      if (!showComments) {
+        setShowComments(true);
+        // Wait for panel to open and load, then scroll to thread
+        setTimeout(() => {
+          if (commentPanelRef.current) {
+            commentPanelRef.current.scrollToThread(threadId);
+          }
+        }, 300);
+      } else {
+        // Panel already open, scroll immediately
+        if (commentPanelRef.current) {
+          commentPanelRef.current.scrollToThread(threadId);
+        }
+      }
+    },
+    [showComments]
+  );
+
+  const handleCreateCommentAtPosition = async (content: string) => {
+    if (!documentId || !commentPosition || !content.trim()) return;
+
+    try {
+      // Content should already be saved from handleCommentClick,
+      // but if for some reason it wasn't, save it now
+      if (editorRef.current) {
+        const editorContent = editorRef.current.getContent();
+        if (
+          editorContent &&
+          JSON.stringify(editorContent) !==
+            JSON.stringify(lastSentContentRef.current)
+        ) {
+          // Content changed since Ctrl+Click, save it now
+          try {
+            await api.put(`/documents/${documentId}`, {
+              content: editorContent,
+            });
+            lastSentContentRef.current = editorContent;
+            lastContentRef.current = editorContent;
+            currentContentRef.current = editorContent;
+          } catch (e) {
+            console.error('Error saving content before comment creation:', e);
+            // Continue anyway - don't block comment creation
+          }
+        }
+      }
+
+      // Create thread with position
+      const threadResponse = await api.post('/comments/threads', {
+        document_id: documentId,
+        position: `pos:${commentPosition.pos}`,
+      });
+
+      // Create first comment
+      await api.post('/comments/', {
+        thread_id: threadResponse.data.id,
+        content: content.trim(),
+      });
+
+      // Reload threads
+      const threadsResponse = await api.get(
+        `/comments/documents/${documentId}/threads`
+      );
+      setCommentThreads(
+        threadsResponse.data.map((t: any) => ({
+          id: t.id,
+          position: t.position,
+          is_resolved: t.is_resolved,
+        }))
+      );
+
+      // Refresh comment panel if it's open
+      if (showComments && commentPanelRef.current) {
+        commentPanelRef.current.refresh();
+      }
+
+      setCommentPosition(null);
+      if (!showComments) {
+        setShowComments(true);
+      }
+    } catch (error: any) {
+      console.error('Error creating comment:', error);
+      alert(error.response?.data?.detail || 'Failed to create comment');
+    }
+  };
+
   return (
     <div className='h-screen flex flex-col'>
       <div className='bg-white border-b px-6 py-4'>
@@ -223,7 +469,7 @@ const DocumentPage: React.FC = () => {
             {/* Public/Private indicator */}
             {!loading && (
               <div
-                className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
+                className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-xs font-medium mr-4 ${
                   isPublic
                     ? 'bg-green-100 text-green-700 border border-green-200'
                     : 'bg-gray-100 text-gray-700 border border-gray-200'
@@ -243,7 +489,7 @@ const DocumentPage: React.FC = () => {
               </div>
             )}
           </div>
-          <div className='flex items-center space-x-4'>
+          <div className='flex items-center space-x-4 ml-4'>
             <div className='flex items-center space-x-2'>
               <div
                 className={`w-3 h-3 rounded-full ${connected ? 'bg-green-500' : 'bg-red-500'}`}
@@ -252,29 +498,80 @@ const DocumentPage: React.FC = () => {
                 {connected ? 'Connected' : 'Disconnected'}
               </span>
             </div>
-            {isOwner && (
+            <div className='flex items-center space-x-2'>
               <button
-                onClick={() => setShowSettings(true)}
-                className='p-2 text-gray-400 hover:text-gray-600 transition-colors'
-                title='Document settings'
+                onClick={() => setShowComments(!showComments)}
+                className={`p-2 rounded transition-colors ${
+                  showComments
+                    ? 'bg-primary-100 text-primary-600'
+                    : 'text-gray-400 hover:text-gray-600'
+                }`}
+                title='Toggle comments'
               >
-                <Cog6ToothIcon className='h-5 w-5' />
+                <ChatBubbleLeftRightIcon className='h-5 w-5' />
               </button>
-            )}
+              {isOwner && (
+                <button
+                  onClick={() => setShowSettings(true)}
+                  className='p-2 text-gray-400 hover:text-gray-600 transition-colors'
+                  title='Document settings'
+                >
+                  <Cog6ToothIcon className='h-5 w-5' />
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
-      <div className='flex-1'>
-        {loading ? (
-          <div className='flex items-center justify-center h-full'>
-            <div className='text-gray-500'>Loading document...</div>
-          </div>
-        ) : (
-          <ProseMirrorEditor
-            value={content}
-            onChange={handleContentChange}
-            className='h-full'
+      <div className='flex-1 flex relative'>
+        <div className='flex-1'>
+          {loading ? (
+            <div className='flex items-center justify-center h-full'>
+              <div className='text-gray-500'>Loading document...</div>
+            </div>
+          ) : (
+            <>
+              <ProseMirrorEditor
+                ref={editorRef}
+                value={content}
+                onChange={handleContentChange}
+                className='h-full'
+                onCommentClick={handleCommentClick}
+                onMarkerClick={handleMarkerClick}
+                commentThreads={commentThreads}
+              />
+              {commentPosition && (
+                <CommentQuickCreate
+                  position={commentPosition}
+                  onCreate={handleCreateCommentAtPosition}
+                  onCancel={() => setCommentPosition(null)}
+                />
+              )}
+            </>
+          )}
+        </div>
+        {documentId && (
+          <CommentPanel
+            ref={commentPanelRef}
+            documentId={documentId}
+            isOpen={showComments}
+            onClose={() => setShowComments(false)}
+            onThreadUpdate={() => {
+              // Reload threads to update markers
+              api
+                .get(`/comments/documents/${documentId}/threads`)
+                .then(response => {
+                  setCommentThreads(
+                    response.data.map((t: any) => ({
+                      id: t.id,
+                      position: t.position,
+                      is_resolved: t.is_resolved,
+                    }))
+                  );
+                })
+                .catch(console.error);
+            }}
           />
         )}
       </div>

@@ -128,38 +128,46 @@ export const Dashboard: React.FC = () => {
           Recent Documents
         </h2>
         <div className='space-y-3'>
-          {documents?.map(document => (
-            <div
-              key={document.id}
-              className='flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:border-primary-300 transition-colors'
-            >
-              <Link
-                to={`/document/${document.id}`}
-                className='flex items-center flex-1'
+          {documents
+            ?.slice()
+            .sort((a, b) => {
+              // Sort by created_at descending (newest first)
+              const dateA = new Date(a.created_at).getTime();
+              const dateB = new Date(b.created_at).getTime();
+              return dateB - dateA;
+            })
+            .map(document => (
+              <div
+                key={document.id}
+                className='flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:border-primary-300 transition-colors'
               >
-                <DocumentTextIcon className='h-6 w-6 text-primary-600 mr-3' />
-                <div>
-                  <h3 className='font-medium text-gray-900'>
-                    {document.title}
-                  </h3>
-                  <p className='text-sm text-gray-500'>
-                    {document.description}
-                  </p>
-                </div>
-              </Link>
-              <div className='flex space-x-2'>
-                <button className='text-gray-400 hover:text-gray-600'>
-                  <PencilIcon className='h-4 w-4' />
-                </button>
-                <button
-                  onClick={() => handleDeleteDocument(document.id)}
-                  className='text-gray-400 hover:text-red-600'
+                <Link
+                  to={`/document/${document.id}`}
+                  className='flex items-center flex-1'
                 >
-                  <TrashIcon className='h-4 w-4' />
-                </button>
+                  <DocumentTextIcon className='h-6 w-6 text-primary-600 mr-3' />
+                  <div>
+                    <h3 className='font-medium text-gray-900'>
+                      {document.title}
+                    </h3>
+                    <p className='text-sm text-gray-500'>
+                      {document.description}
+                    </p>
+                  </div>
+                </Link>
+                <div className='flex space-x-2'>
+                  <button className='text-gray-400 hover:text-gray-600'>
+                    <PencilIcon className='h-4 w-4' />
+                  </button>
+                  <button
+                    onClick={() => handleDeleteDocument(document.id)}
+                    className='text-gray-400 hover:text-red-600'
+                  >
+                    <TrashIcon className='h-4 w-4' />
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
         </div>
       </div>
 

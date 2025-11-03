@@ -71,3 +71,32 @@ class UpdateWorkspaceDTO(BaseModel):
     name: str | None = None
     description: str | None = None
     avatar_url: str | None = None
+
+
+# Comment DTOs
+class CreateCommentThreadDTO(BaseModel):
+    """DTO for creating a comment thread."""
+
+    document_id: uuid.UUID
+    block_id: uuid.UUID | None = None
+    position: str | None = None
+
+
+class UpdateCommentThreadDTO(BaseModel):
+    """DTO for updating a comment thread."""
+
+    is_resolved: bool | None = None
+
+
+class CreateCommentDTO(BaseModel):
+    """DTO for creating a comment."""
+
+    thread_id: uuid.UUID
+    content: str
+    parent_id: uuid.UUID | None = None
+
+
+class UpdateCommentDTO(BaseModel):
+    """DTO for updating a comment."""
+
+    content: str

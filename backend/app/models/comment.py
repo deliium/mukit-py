@@ -7,6 +7,7 @@ from sqlalchemy import Boolean, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
+from app.schemas.dto import CommentReadModel, CommentThreadReadModel
 
 if TYPE_CHECKING:
     import uuid
@@ -33,6 +34,18 @@ class CommentThread(Base):
     block: Mapped[Block | None] = relationship(back_populates="comment_threads")
     comments: Mapped[list[Comment]] = relationship(back_populates="thread")
 
+    def to_read_model(self) -> CommentThreadReadModel:
+        """Convert CommentThread model to CommentThreadReadModel."""
+        return CommentThreadReadModel(
+            id=self.id,
+            document_id=self.document_id,
+            block_id=self.block_id,
+            position=self.position,
+            is_resolved=self.is_resolved,
+            created_at=self.created_at,
+            updated_at=self.updated_at,
+        )
+
 
 class Comment(Base):
     __tablename__ = "comments"
@@ -52,6 +65,19 @@ class Comment(Base):
     author: Mapped[User] = relationship(back_populates="comments")
     parent: Mapped[Comment | None] = relationship(remote_side="Comment.id")
     replies: Mapped[list[Comment]] = relationship(back_populates="parent")
+
+    def to_read_model(self) -> CommentReadModel:
+        """Convert Comment model to CommentReadModel."""
+        return CommentReadModel(
+            id=self.id,
+            thread_id=self.thread_id,
+            author_id=self.author_id,
+            parent_id=self.parent_id,
+            content=self.content,
+            is_edited=self.is_edited,
+            created_at=self.created_at,
+            updated_at=self.updated_at,
+        )
 
 
 __all__ = [

@@ -1,9 +1,30 @@
 import '@testing-library/jest-dom';
 import { vi } from 'vitest';
 
+// Suppress React act() warnings - waitFor from @testing-library/react
+// automatically wraps state updates in act(), so these warnings are safe to ignore
+const originalError = console.error;
+beforeAll(() => {
+  console.error = (...args: any[]) => {
+    if (
+      typeof args[0] === 'string' &&
+      args[0].includes('An update to') &&
+      args[0].includes('inside a test was not wrapped in act')
+    ) {
+      return; // Suppress this specific warning
+    }
+    originalError.call(console, ...args);
+  };
+});
+
+afterAll(() => {
+  console.error = originalError;
+});
+
 // Mock environment variables
 Object.defineProperty(import.meta, 'env', {
   value: {
+    MODE: 'test',
     VITE_API_URL: 'http://localhost:8888/api/v1',
     VITE_WS_URL: 'ws://localhost:8888',
   },

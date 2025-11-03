@@ -41,15 +41,26 @@ vi.mock('../../hooks/useWebSocket', () => ({
 }));
 
 // Mock ProseMirrorEditor
-vi.mock('../../components/ProseMirrorEditor', () => ({
-  default: ({ onChange }: any) => (
-    <div data-testid='prosemirror-editor'>
-      <button onClick={() => onChange({ type: 'doc', content: [] })}>
-        Change Content
-      </button>
-    </div>
-  ),
-}));
+vi.mock('../../components/ProseMirrorEditor', () => {
+  const MockProseMirrorEditor = React.forwardRef(
+    ({ onChange }: any, ref: any) => {
+      React.useImperativeHandle(ref, () => ({
+        getContent: () => ({ type: 'doc', content: [] }),
+      }));
+      return (
+        <div data-testid='prosemirror-editor'>
+          <button onClick={() => onChange({ type: 'doc', content: [] })}>
+            Change Content
+          </button>
+        </div>
+      );
+    }
+  );
+  MockProseMirrorEditor.displayName = 'MockProseMirrorEditor';
+  return {
+    default: MockProseMirrorEditor,
+  };
+});
 
 // Mock API
 const mockApiGet = vi.fn();
@@ -93,9 +104,20 @@ const renderWithRouter = async (component: React.ReactElement) => {
       {component}
     </BrowserRouter>
   );
-  // Allow useEffect to run and wait for async operations
-  // The warnings are non-critical - they occur because useEffect runs
-  // after render, but waitFor in tests handles the async updates correctly
+
+  // Wait for document to load - waitFor automatically wraps updates in act()
+  // Wait for either document title or editor to appear (loading complete)
+  await waitFor(
+    () => {
+      const documentTitle = result.queryByText('Test Document');
+      const editor = result.queryByTestId('prosemirror-editor');
+      if (!documentTitle && !editor) {
+        throw new Error('Document not loaded yet');
+      }
+    },
+    { timeout: 3000 }
+  );
+
   return result;
 };
 
@@ -104,8 +126,41 @@ describe('Document Page - Title Editing', () => {
     vi.clearAllMocks();
     useAuthMock.mockReturnValue(mockAuthContext);
     // Mock API to resolve immediately
-    mockApiGet.mockResolvedValue({
-      data: mockDocument,
+    // Always return array for comment threads endpoints
+    mockApiGet.mockImplementation((url: string | any[]) => {
+      // Handle string URLs
+      if (typeof url === 'string') {
+        if (
+          url.includes('/documents/document-123') &&
+          !url.includes('/comments')
+        ) {
+          return Promise.resolve({ data: mockDocument });
+        }
+        // Always return array for comment threads endpoints
+        if (url.includes('/comments/documents/') && url.includes('/threads')) {
+          return Promise.resolve({ data: [] });
+        }
+        return Promise.resolve({ data: mockDocument });
+      }
+      // Handle array arguments (axios.get(url, config))
+      if (Array.isArray(url) && url[0]) {
+        const urlString = url[0];
+        if (typeof urlString === 'string') {
+          if (
+            urlString.includes('/documents/document-123') &&
+            !urlString.includes('/comments')
+          ) {
+            return Promise.resolve({ data: mockDocument });
+          }
+          if (
+            urlString.includes('/comments/documents/') &&
+            urlString.includes('/threads')
+          ) {
+            return Promise.resolve({ data: [] });
+          }
+        }
+      }
+      return Promise.resolve({ data: mockDocument });
     });
     mockApiPut.mockResolvedValue({
       data: { ...mockDocument, title: 'Updated Title' },
@@ -494,6 +549,7 @@ describe('Document Page - Title Editing', () => {
       resolveApiCall = resolve;
     });
     mockApiPut.mockReturnValueOnce(slowApiPromise);
+    // Note: mockApiGet is already set up in beforeEach to handle comment threads
 
     await renderWithRouter(<DocumentPage />);
 
