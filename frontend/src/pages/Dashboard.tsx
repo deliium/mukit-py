@@ -11,10 +11,15 @@ import {
   TrashIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 export const Dashboard: React.FC = () => {
   const [showCreateWorkspace, setShowCreateWorkspace] = useState(false);
   const [showCreateDocument, setShowCreateDocument] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    isOpen: boolean;
+    documentId: string | null;
+  }>({ isOpen: false, documentId: null });
   const [newWorkspace, setNewWorkspace] = useState({
     name: '',
     description: '',
@@ -60,17 +65,20 @@ export const Dashboard: React.FC = () => {
     }
   };
 
-  const handleDeleteDocument = async (id: string) => {
-    if (window.confirm('Are you sure you want to delete this document?')) {
-      try {
-        await api.delete(`/documents/${id}`);
-        toast.success('Document deleted successfully!');
-        refetchDocuments();
-      } catch (error: any) {
-        toast.error(
-          error.response?.data?.detail || 'Failed to delete document'
-        );
-      }
+  const handleDeleteDocument = (id: string) => {
+    setDeleteConfirm({ isOpen: true, documentId: id });
+  };
+
+  const confirmDeleteDocument = async () => {
+    if (!deleteConfirm.documentId) return;
+
+    try {
+      await api.delete(`/documents/${deleteConfirm.documentId}`);
+      toast.success('Document deleted successfully!');
+      refetchDocuments();
+      setDeleteConfirm({ isOpen: false, documentId: null });
+    } catch (error: any) {
+      toast.error(error.response?.data?.detail || 'Failed to delete document');
     }
   };
 
@@ -298,6 +306,18 @@ export const Dashboard: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Delete Document Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={deleteConfirm.isOpen}
+        title='Delete Document'
+        message='Are you sure you want to delete this document? This action cannot be undone.'
+        confirmText='Delete'
+        cancelText='Cancel'
+        onConfirm={confirmDeleteDocument}
+        onCancel={() => setDeleteConfirm({ isOpen: false, documentId: null })}
+        variant='danger'
+      />
     </div>
   );
 };
