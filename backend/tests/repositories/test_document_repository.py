@@ -70,9 +70,7 @@ class TestDocumentRepository:
 
         assert len(documents_read) >= 1
         assert any(doc.id == test_document.id for doc in documents_read)
-        assert all(
-            doc.workspace_id == test_workspace.id for doc in documents_read
-        )
+        assert all(doc.workspace_id == test_workspace.id for doc in documents_read)
 
     async def test_update_document(self, db_session, test_document):
         """Test updating a document."""
@@ -128,13 +126,9 @@ class TestDocumentRepository:
 
         assert isinstance(versions_read, list)
         assert len(versions_read) >= 1
-        assert all(
-            isinstance(v, DocumentVersionReadModel) for v in versions_read
-        )
+        assert all(isinstance(v, DocumentVersionReadModel) for v in versions_read)
 
-    async def test_get_public_documents(
-        self, db_session, test_user, test_document
-    ):
+    async def test_get_public_documents(self, db_session, test_user, test_document):
         """Test getting public documents."""
         from app.models.document import Document as DocumentModel
 
@@ -158,5 +152,3 @@ class TestDocumentRepository:
         assert all(doc.is_public for doc in public_docs)
         # Private document should not be in the list
         assert not any(doc.id == test_document.id for doc in public_docs)
-
-

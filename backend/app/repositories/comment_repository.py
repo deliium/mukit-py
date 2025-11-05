@@ -59,6 +59,7 @@ class CommentRepository:
         self,
         thread_id: uuid.UUID,
         is_resolved: bool | None = None,
+        position: str | None = None,
     ) -> CommentThreadReadModel | None:
         """Update comment thread."""
         result = await self.db.execute(
@@ -70,6 +71,8 @@ class CommentRepository:
 
         if is_resolved is not None:
             thread.is_resolved = is_resolved
+        if position is not None:
+            thread.position = position
 
         await self.db.commit()
         await self.db.refresh(thread)

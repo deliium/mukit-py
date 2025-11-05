@@ -75,9 +75,7 @@ class TestCommentRepository:
         thread = await repository.get_thread_by_id(test_comment_thread.id)
         assert thread is None
 
-    async def test_create_comment(
-        self, db_session, test_user, test_comment_thread
-    ):
+    async def test_create_comment(self, db_session, test_user, test_comment_thread):
         """Test creating a comment."""
         repository = CommentRepository(db_session)
 
@@ -165,4 +163,3 @@ class TestCommentRepository:
         # Verify comment is deleted
         comment = await repository.get_comment_by_id(test_comment.id)
         assert comment is None
-

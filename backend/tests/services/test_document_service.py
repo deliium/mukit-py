@@ -19,9 +19,7 @@ class TestDocumentService:
         """Test creating a document."""
         document_repository = DocumentRepository(db_session)
         workspace_repository = WorkspaceRepository(db_session)
-        document_service = DocumentService(
-            document_repository, workspace_repository
-        )
+        document_service = DocumentService(document_repository, workspace_repository)
 
         dto = CreateDocumentDTO(
             title="New Document",
@@ -39,15 +37,11 @@ class TestDocumentService:
         assert document.workspace_id == test_workspace.id
         assert document.is_public is False
 
-    async def test_create_document_without_workspace(
-        self, db_session, test_user
-    ):
+    async def test_create_document_without_workspace(self, db_session, test_user):
         """Test creating a document without workspace."""
         document_repository = DocumentRepository(db_session)
         workspace_repository = WorkspaceRepository(db_session)
-        document_service = DocumentService(
-            document_repository, workspace_repository
-        )
+        document_service = DocumentService(document_repository, workspace_repository)
 
         dto = CreateDocumentDTO(
             title="New Document",
@@ -61,17 +55,13 @@ class TestDocumentService:
         assert document.owner_id == test_user.id
         assert document.workspace_id is None
 
-    async def test_get_public_documents(
-        self, db_session, test_user, test_document
-    ):
+    async def test_get_public_documents(self, db_session, test_user, test_document):
         """Test getting public documents."""
         from app.models.document import Document as DocumentModel
 
         document_repository = DocumentRepository(db_session)
         workspace_repository = WorkspaceRepository(db_session)
-        document_service = DocumentService(
-            document_repository, workspace_repository
-        )
+        document_service = DocumentService(document_repository, workspace_repository)
 
         # Create a public document
         public_doc = DocumentModel(
@@ -99,9 +89,7 @@ class TestDocumentService:
 
         document_repository = DocumentRepository(db_session)
         workspace_repository = WorkspaceRepository(db_session)
-        document_service = DocumentService(
-            document_repository, workspace_repository
-        )
+        document_service = DocumentService(document_repository, workspace_repository)
 
         # Make document public
         test_document.is_public = True
@@ -119,9 +107,7 @@ class TestDocumentService:
         await db_session.commit()
 
         # Other user should be able to access public document
-        document = await document_service.get_document(
-            test_document.id, other_user.id
-        )
+        document = await document_service.get_document(test_document.id, other_user.id)
 
         assert document.id == test_document.id
         assert document.is_public is True
@@ -135,9 +121,7 @@ class TestDocumentService:
 
         document_repository = DocumentRepository(db_session)
         workspace_repository = WorkspaceRepository(db_session)
-        document_service = DocumentService(
-            document_repository, workspace_repository
-        )
+        document_service = DocumentService(document_repository, workspace_repository)
 
         # Create another user
         other_user = UserModel(
@@ -162,9 +146,7 @@ class TestDocumentService:
         """Test updating document is_public field."""
         document_repository = DocumentRepository(db_session)
         workspace_repository = WorkspaceRepository(db_session)
-        document_service = DocumentService(
-            document_repository, workspace_repository
-        )
+        document_service = DocumentService(document_repository, workspace_repository)
 
         dto = UpdateDocumentDTO(is_public=True)
 
@@ -183,9 +165,7 @@ class TestDocumentService:
 
         document_repository = DocumentRepository(db_session)
         workspace_repository = WorkspaceRepository(db_session)
-        document_service = DocumentService(
-            document_repository, workspace_repository
-        )
+        document_service = DocumentService(document_repository, workspace_repository)
 
         # Create another user
         other_user = UserModel(
@@ -201,10 +181,6 @@ class TestDocumentService:
         dto = UpdateDocumentDTO(title="Hacked Title")
 
         with pytest.raises(HTTPException) as exc_info:
-            await document_service.update_document(
-                test_document.id, dto, other_user.id
-            )
+            await document_service.update_document(test_document.id, dto, other_user.id)
 
         assert exc_info.value.status_code == 403
-
-

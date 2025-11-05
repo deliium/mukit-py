@@ -20,6 +20,8 @@ interface CommentPanelProps {
   isOpen: boolean;
   onClose: () => void;
   onThreadUpdate?: () => void;
+  onDeleteThread?: (threadId: string) => void;
+  editorRef?: React.RefObject<any>;
 }
 
 export interface CommentPanelRef {
@@ -28,7 +30,10 @@ export interface CommentPanelRef {
 }
 
 const CommentPanel = forwardRef<CommentPanelRef, CommentPanelProps>(
-  ({ documentId, isOpen, onClose, onThreadUpdate }, ref) => {
+  (
+    { documentId, isOpen, onClose, onThreadUpdate, onDeleteThread, editorRef },
+    ref
+  ) => {
     const { user } = useAuth();
     const [threads, setThreads] = useState<CommentThread[]>([]);
     const [loading, setLoading] = useState(false);
@@ -222,9 +227,16 @@ const CommentPanel = forwardRef<CommentPanelRef, CommentPanelProps>(
                 <CommentThreadComponent
                   thread={thread}
                   currentUserId={user?.id || ''}
-                  onDelete={(threadId: string) => setDeleteThreadId(threadId)}
+                  onDelete={(threadId: string) => {
+                    if (onDeleteThread) {
+                      onDeleteThread(threadId);
+                    } else {
+                      setDeleteThreadId(threadId);
+                    }
+                  }}
                   onResolve={handleResolveThread}
                   onUpdate={loadThreads}
+                  editorRef={editorRef}
                 />
               </div>
             ))

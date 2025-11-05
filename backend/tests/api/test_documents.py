@@ -273,9 +273,7 @@ async def test_update_document_is_public_unauthorized(
         "/api/v1/auth/login",
         json={"email": other_user.email, "password": "password123"},
     )
-    other_headers = {
-        "Authorization": f"Bearer {login_response.json()['access_token']}"
-    }
+    other_headers = {"Authorization": f"Bearer {login_response.json()['access_token']}"}
 
     # Try to update document as other_user
     update_data = {"is_public": True}

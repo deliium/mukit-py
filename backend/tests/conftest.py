@@ -169,9 +169,7 @@ async def auth_headers(
 
 
 @pytest_asyncio.fixture
-async def test_comment_thread(
-    db_session, test_user, test_document
-):
+async def test_comment_thread(db_session, test_user, test_document):
     """Create a test comment thread."""
     from app.models.comment import CommentThread
 
@@ -188,9 +186,7 @@ async def test_comment_thread(
 
 
 @pytest_asyncio.fixture
-async def test_comment(
-    db_session, test_user, test_comment_thread
-):
+async def test_comment(db_session, test_user, test_comment_thread):
     """Create a test comment."""
     from app.models.comment import Comment
 
@@ -208,9 +204,7 @@ async def test_comment(
 
 
 @pytest_asyncio.fixture
-async def test_comment_other_user(
-    db_session, test_user, test_comment_thread
-):
+async def test_comment_other_user(db_session, test_user, test_comment_thread):
     """Create a comment by another user."""
     from app.models.comment import Comment
     from app.models.user import User as UserModel
@@ -242,9 +236,7 @@ async def test_comment_other_user(
 
 
 @pytest_asyncio.fixture
-async def test_document_private(
-    db_session, test_user
-):
+async def test_document_private(db_session, test_user):
     """Create a private document owned by another user."""
     from app.models.document import Document as DocumentModel
     from app.models.user import User as UserModel

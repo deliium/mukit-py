@@ -103,9 +103,7 @@ class TestWorkspaceRepository:
         assert member_read.user_id == test_user.id
         assert member_read.role == "member"
 
-    async def test_get_member(
-        self, db_session, test_workspace, test_user
-    ):
+    async def test_get_member(self, db_session, test_workspace, test_user):
         """Test getting a workspace member."""
         repository = WorkspaceRepository(db_session)
 
@@ -127,5 +125,3 @@ class TestWorkspaceRepository:
         )
 
         assert member_read is None
-
-

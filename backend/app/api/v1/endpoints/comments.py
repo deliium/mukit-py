@@ -2,7 +2,7 @@
 
 import uuid
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 
 from app.api.deps import get_current_active_user
 from app.api.deps_services import get_comment_service
@@ -129,3 +129,26 @@ async def delete_comment(
     if not success:
         return {"message": "Failed to delete comment"}
     return {"message": "Comment deleted successfully"}
+
+
+@router.post("/threads/update-positions")
+async def update_comment_positions(
+    updates: dict[str, str],  # {"thread_id": "position"}
+    current_user: User = Depends(get_current_active_user),
+    comment_service: CommentService = Depends(get_comment_service),
+) -> dict[str, int]:
+    """Update positions for multiple comment threads."""
+    updated = 0
+    for thread_id_str, position in updates.items():
+        try:
+            thread_id = uuid.UUID(thread_id_str)
+            await comment_service.update_thread(
+                thread_id,
+                UpdateCommentThreadDTO(position=position),
+                current_user.id,
+            )
+            updated += 1
+        except (ValueError, HTTPException):
+            continue
+
+    return {"updated": updated}

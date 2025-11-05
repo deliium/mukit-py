@@ -143,7 +143,9 @@ class CommentService:
             )
 
         updated_thread = await self.comment_repository.update_thread(
-            thread_id, is_resolved=dto.is_resolved
+            thread_id,
+            is_resolved=dto.is_resolved,
+            position=dto.position,
         )
         if not updated_thread:
             raise HTTPException(

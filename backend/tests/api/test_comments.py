@@ -271,4 +271,3 @@ async def test_update_comment_by_non_owner(
     )
 
     assert response.status_code == 403
-

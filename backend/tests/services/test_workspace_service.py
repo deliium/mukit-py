@@ -26,18 +26,14 @@ class TestWorkspaceService:
             description="Test workspace",
         )
 
-        workspace = await workspace_service.create_workspace(
-            dto, test_user.id
-        )
+        workspace = await workspace_service.create_workspace(dto, test_user.id)
 
         assert workspace.name == "New Workspace"
         assert workspace.slug == "new-workspace"
         assert workspace.owner_id == test_user.id
 
         # Verify owner is added as member
-        member = await workspace_repository.get_member(
-            workspace.id, test_user.id
-        )
+        member = await workspace_repository.get_member(workspace.id, test_user.id)
         assert member is not None
         assert member.role == "owner"
 
@@ -60,9 +56,7 @@ class TestWorkspaceService:
         assert exc_info.value.status_code == 400
         assert "Workspace slug already exists" in str(exc_info.value.detail)
 
-    async def test_create_workspace_wrong_owner(
-        self, db_session, test_user
-    ):
+    async def test_create_workspace_wrong_owner(self, db_session, test_user):
         """Test creating workspace with wrong owner_id."""
         from app.models.user import User as UserModel
         from app.core.security import get_password_hash
@@ -136,15 +130,11 @@ class TestWorkspaceService:
         await db_session.commit()
 
         with pytest.raises(HTTPException) as exc_info:
-            await workspace_service.get_workspace(
-                test_workspace.id, other_user.id
-            )
+            await workspace_service.get_workspace(test_workspace.id, other_user.id)
 
         assert exc_info.value.status_code == 403
 
-    async def test_update_workspace(
-        self, db_session, test_user, test_workspace
-    ):
+    async def test_update_workspace(self, db_session, test_user, test_workspace):
         """Test updating a workspace."""
         workspace_repository = WorkspaceRepository(db_session)
         workspace_service = WorkspaceService(workspace_repository)
@@ -196,5 +186,3 @@ class TestWorkspaceService:
             )
 
         assert exc_info.value.status_code == 403
-
-

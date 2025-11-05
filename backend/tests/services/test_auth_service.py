@@ -83,9 +83,7 @@ class TestAuthService:
         auth_service = AuthService(user_repository)
 
         with pytest.raises(HTTPException) as exc_info:
-            await auth_service.login(
-                email=test_user.email, password="wrongpassword"
-            )
+            await auth_service.login(email=test_user.email, password="wrongpassword")
 
         assert exc_info.value.status_code == 401
         assert "Incorrect email or password" in str(exc_info.value.detail)
@@ -102,4 +100,3 @@ class TestAuthService:
 
         assert exc_info.value.status_code == 401
         assert "Incorrect email or password" in str(exc_info.value.detail)
-

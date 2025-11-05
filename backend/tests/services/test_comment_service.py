@@ -21,9 +21,7 @@ from app.services.dto import (
 class TestCommentService:
     """Test CommentService."""
 
-    async def test_create_thread(
-        self, db_session, test_user, test_document
-    ):
+    async def test_create_thread(self, db_session, test_user, test_document):
         """Test creating a comment thread."""
         comment_repository = CommentRepository(db_session)
         document_repository = DocumentRepository(db_session)
@@ -43,9 +41,7 @@ class TestCommentService:
         assert thread.position == "pos:10"
         assert thread.is_resolved is False
 
-    async def test_create_thread_without_access(
-        self, db_session, test_user
-    ):
+    async def test_create_thread_without_access(self, db_session, test_user):
         """Test creating a thread without document access."""
         from app.models.document import Document as DocumentModel
         from app.models.user import User as UserModel
@@ -121,9 +117,7 @@ class TestCommentService:
         assert len(threads) >= 1
         assert any(t.id == test_comment_thread.id for t in threads)
 
-    async def test_update_thread(
-        self, db_session, test_user, test_comment_thread
-    ):
+    async def test_update_thread(self, db_session, test_user, test_comment_thread):
         """Test updating a thread."""
         comment_repository = CommentRepository(db_session)
         document_repository = DocumentRepository(db_session)
@@ -140,9 +134,7 @@ class TestCommentService:
 
         assert updated_thread.is_resolved is True
 
-    async def test_delete_thread(
-        self, db_session, test_user, test_comment_thread
-    ):
+    async def test_delete_thread(self, db_session, test_user, test_comment_thread):
         """Test deleting a thread."""
         comment_repository = CommentRepository(db_session)
         document_repository = DocumentRepository(db_session)
@@ -161,9 +153,7 @@ class TestCommentService:
         thread = await comment_repository.get_thread_by_id(test_comment_thread.id)
         assert thread is None
 
-    async def test_create_comment(
-        self, db_session, test_user, test_comment_thread
-    ):
+    async def test_create_comment(self, db_session, test_user, test_comment_thread):
         """Test creating a comment."""
         comment_repository = CommentRepository(db_session)
         document_repository = DocumentRepository(db_session)
@@ -172,9 +162,7 @@ class TestCommentService:
             comment_repository, document_repository, workspace_repository
         )
 
-        dto = CreateCommentDTO(
-            thread_id=test_comment_thread.id, content="New comment"
-        )
+        dto = CreateCommentDTO(thread_id=test_comment_thread.id, content="New comment")
 
         comment = await comment_service.create_comment(dto, test_user.id)
 
@@ -204,9 +192,7 @@ class TestCommentService:
         assert reply.parent_id == test_comment.id
         assert reply.content == "This is a reply"
 
-    async def test_update_comment(
-        self, db_session, test_user, test_comment
-    ):
+    async def test_update_comment(self, db_session, test_user, test_comment):
         """Test updating a comment."""
         comment_repository = CommentRepository(db_session)
         document_repository = DocumentRepository(db_session)
@@ -244,9 +230,7 @@ class TestCommentService:
 
         assert exc_info.value.status_code == 403
 
-    async def test_delete_comment(
-        self, db_session, test_user, test_comment
-    ):
+    async def test_delete_comment(self, db_session, test_user, test_comment):
         """Test deleting a comment."""
         comment_repository = CommentRepository(db_session)
         document_repository = DocumentRepository(db_session)
@@ -280,4 +264,3 @@ class TestCommentService:
             )
 
         assert exc_info.value.status_code == 403
-

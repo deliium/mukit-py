@@ -86,6 +86,7 @@ class UpdateCommentThreadDTO(BaseModel):
     """DTO for updating a comment thread."""
 
     is_resolved: bool | None = None
+    position: str | None = None
 
 
 class CreateCommentDTO(BaseModel):
@@ -100,3 +101,9 @@ class UpdateCommentDTO(BaseModel):
     """DTO for updating a comment."""
 
     content: str
+
+
+class UpdateCommentPositionsDTO(BaseModel):
+    """DTO for updating comment thread positions."""
+
+    updates: list[dict[str, str]]  # [{"thread_id": "...", "position": "pos:123"}]

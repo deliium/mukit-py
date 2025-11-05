@@ -14,6 +14,7 @@ interface CommentThreadProps {
   onDelete: (threadId: string) => void;
   onResolve: (threadId: string, isResolved: boolean) => void;
   onUpdate: () => void;
+  editorRef?: React.RefObject<any>;
 }
 
 const CommentThreadComponent: React.FC<CommentThreadProps> = ({
@@ -22,6 +23,7 @@ const CommentThreadComponent: React.FC<CommentThreadProps> = ({
   onDelete,
   onResolve,
   onUpdate,
+  editorRef,
 }) => {
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [replyContent, setReplyContent] = useState('');
@@ -120,7 +122,75 @@ const CommentThreadComponent: React.FC<CommentThreadProps> = ({
             )}
           </button>
           <button
-            onClick={() => onDelete(thread.id)}
+            onMouseDown={e => {
+              // CRITICAL: Save editor focus state on mousedown (BEFORE click steals focus)
+              // This ensures we capture the cursor position while editor still has focus
+              // mousedown fires before the button receives focus
+              const view = editorRef?.current?.getView?.();
+              const hadFocus =
+                view &&
+                typeof document !== 'undefined' &&
+                document &&
+                (document as any).activeElement === view.dom;
+              const selection =
+                view && hadFocus && view.state ? view.state.selection : null;
+
+              // DEBUG: Log focus state before delete button mousedown
+              if (import.meta.env.MODE !== 'test') {
+                console.log(
+                  '🔍 [CURSOR DEBUG] Before delete button mousedown:',
+                  {
+                    activeElement:
+                      typeof document !== 'undefined' && document
+                        ? (document as any).activeElement?.tagName
+                        : null,
+                    editorHasFocus: hadFocus,
+                    selection: selection
+                      ? {
+                          anchor: selection.anchor,
+                          head: selection.head,
+                          from: selection.from,
+                          to: selection.to,
+                        }
+                      : null,
+                    docSize: view?.state?.doc?.content?.size || 0,
+                    timestamp: new Date().toISOString(),
+                  }
+                );
+              }
+
+              // Store focus state globally so handleDeleteThread can access it
+              if (
+                hadFocus &&
+                view &&
+                selection &&
+                typeof window !== 'undefined'
+              ) {
+                (window as any).__lastEditorFocusState = {
+                  hadFocus,
+                  selection: {
+                    anchor: selection.anchor,
+                    head: selection.head,
+                    from: selection.from,
+                    to: selection.to,
+                  },
+                  docSize: view.state.doc.content.size,
+                };
+              }
+
+              // Prevent default to keep focus on editor
+              // But we still want the click to work, so we'll handle it manually
+              e.preventDefault();
+
+              // Trigger delete after a tiny delay to allow focus state to be saved
+              setTimeout(() => {
+                onDelete(thread.id);
+              }, 0);
+            }}
+            onClick={e => {
+              // Prevent default click behavior since we handle it in mousedown
+              e.preventDefault();
+            }}
             className='p-1 text-red-400 hover:text-red-600 rounded'
             title='Delete thread'
           >
