@@ -2,7 +2,7 @@ import os
 import sys
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config, pool
+from sqlalchemy import engine_from_config, pool, text
 
 from alembic import context
 
@@ -68,7 +68,88 @@ def run_migrations_online() -> None:
         poolclass=pool.NullPool,
     )
 
+    # Get the database URL to extract user and database name
+    db_url = config.get_main_option("sqlalchemy.url")
+    
+    # Parse the URL to get components
+    db_name = "mukit"  # default
+    db_user = "mukit"  # default
+    
+    # Try to grant privileges using postgres superuser
+    try:
+        from urllib.parse import urlparse
+        parsed = urlparse(db_url.replace("postgresql://", "postgres://"))
+        db_name = parsed.path.lstrip("/") or "mukit"
+        db_user = parsed.username or "mukit"
+        
+        # Try to connect as postgres superuser to grant privileges
+        # This will work if postgres user exists and has default password
+        postgres_urls = [
+            f"postgresql://postgres:postgres@localhost:5432/{db_name}",
+            f"postgresql://postgres@localhost:5432/{db_name}",
+            f"postgresql://postgres:postgres@{parsed.hostname}:{parsed.port or 5432}/{db_name}",
+        ]
+        
+        granted = False
+        for postgres_url in postgres_urls:
+            try:
+                postgres_engine = engine_from_config(
+                    {"sqlalchemy.url": postgres_url},
+                    prefix="sqlalchemy.",
+                    poolclass=pool.NullPool,
+                )
+                with postgres_engine.connect() as postgres_conn:
+                    postgres_conn.execute(text(f"GRANT USAGE, CREATE ON SCHEMA public TO {db_user}"))
+                    postgres_conn.execute(text(f"ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO {db_user}"))
+                    postgres_conn.execute(text(f"ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO {db_user}"))
+                    postgres_conn.commit()
+                    granted = True
+                    break
+            except Exception:
+                continue
+            finally:
+                try:
+                    postgres_engine.dispose()
+                except Exception:
+                    pass
+        
+        if not granted:
+            print("Warning: Could not grant schema privileges. Please run as postgres superuser:")
+            print(f"  GRANT USAGE, CREATE ON SCHEMA public TO {db_user};")
+            print(f"  ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO {db_user};")
+            print(f"  ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO {db_user};")
+    except Exception as e:
+        print(f"Warning: Could not parse database URL or grant privileges: {e}")
+        print("Please grant schema privileges manually as postgres superuser")
+
+    # Now proceed with migrations using the original connection
+    # Check if we have privileges before attempting migrations
     with connectable.connect() as connection:
+        try:
+            # Try to check if we can use the schema
+            connection.execute(text("SELECT 1 FROM information_schema.schemata WHERE schema_name = 'public'"))
+            connection.commit()
+        except Exception as e:
+            if "permission denied" in str(e).lower() or "insufficient privilege" in str(e).lower():
+                print("\n" + "="*70)
+                print("ERROR: Database user does not have privileges on schema 'public'")
+                print("="*70)
+                print("\nPlease grant privileges as postgres superuser:")
+                print(f"\n  psql -U postgres -d {db_name}")
+                print(f"  GRANT USAGE, CREATE ON SCHEMA public TO {db_user};")
+                print(f"  ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO {db_user};")
+                print(f"  ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO {db_user};")
+                print("\nOr use the provided script:")
+                print(f"  psql -U postgres -d {db_name} -f backend/scripts/grant_schema_privileges.sql")
+                print("\n" + "="*70 + "\n")
+                raise
+            else:
+                # Other error, continue anyway
+                try:
+                    connection.rollback()
+                except Exception:
+                    pass
+        
         context.configure(connection=connection, target_metadata=target_metadata)
 
         with context.begin_transaction():

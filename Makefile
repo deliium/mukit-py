@@ -103,6 +103,15 @@ db-upgrade:
 	@echo "Upgrading database..."
 	cd backend && source ../venv/bin/activate && alembic upgrade head
 
+db-grant-privileges:
+	@echo "Granting schema privileges (requires postgres superuser)..."
+	@echo "Please run this command manually:"
+	@echo "  psql -U postgres -d mukit -f backend/scripts/grant_schema_privileges.sql"
+	@echo "Or run SQL commands:"
+	@echo "  psql -U postgres -d mukit -c \"GRANT USAGE, CREATE ON SCHEMA public TO mukit;\""
+	@echo "  psql -U postgres -d mukit -c \"ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO mukit;\""
+	@echo "  psql -U postgres -d mukit -c \"ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO mukit;\""
+
 db-downgrade:
 	@echo "Downgrading database..."
 	cd backend && source ../venv/bin/activate && alembic downgrade -1
