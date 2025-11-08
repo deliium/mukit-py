@@ -133,3 +133,5 @@ temp/
 
 # Uploads
 uploads/
+
+backend/bandit-report.json
