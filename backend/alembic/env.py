@@ -16,6 +16,48 @@ from app.models import *  # Import all models
 # access to the values within the .ini file in use.
 config = context.config
 
+# Override sqlalchemy.url from environment variable or .env file
+# Priority: DATABASE_URL env var > .env file > alembic.ini
+database_url = None
+
+# First, try to get from environment variable
+database_url = os.environ.get("DATABASE_URL")
+
+# If not in env var, try to load from .env file via app.core.config
+# Make sure .env file is in the backend directory
+if not database_url:
+    try:
+        # Ensure .env file path is correct (backend/.env)
+        backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        env_file = os.path.join(backend_dir, ".env")
+        if os.path.exists(env_file):
+            # pydantic-settings will automatically look for .env in current directory
+            # Change to backend directory temporarily
+            original_cwd = os.getcwd()
+            try:
+                os.chdir(backend_dir)
+                from app.core.config import settings
+                database_url = settings.DATABASE_URL
+            finally:
+                os.chdir(original_cwd)
+        else:
+            # Try loading anyway, in case .env is in a different location
+            from app.core.config import settings
+            database_url = settings.DATABASE_URL
+    except Exception as e:
+        # If loading from config fails, fall back to alembic.ini
+        print(f"Warning: Could not load DATABASE_URL from .env file: {e}")
+        print("Falling back to alembic.ini configuration")
+
+# Convert asyncpg URL to psycopg2 URL for Alembic (synchronous)
+# Alembic uses synchronous SQLAlchemy, so it needs psycopg2, not asyncpg
+if database_url:
+    # Replace postgresql+asyncpg:// with postgresql://
+    database_url = database_url.replace("postgresql+asyncpg://", "postgresql://")
+    # Set it in the config
+    config.set_main_option("sqlalchemy.url", database_url)
+    print(f"Using DATABASE_URL from environment/.env: {database_url.split('@')[0]}@...")
+
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
 if config.config_file_name is not None:
