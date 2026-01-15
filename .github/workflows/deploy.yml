@@ -185,7 +185,7 @@ jobs:
           npm run build
           echo "✅ Frontend build completed"
 
-      - name: Deploy to server
+      - name: Deploy backend to server
         env:
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_USER: ${{ secrets.SSH_USER }}
@@ -196,13 +196,37 @@ jobs:
           SECRET_KEY: ${{ secrets.SECRET_KEY }}
           ALLOWED_ORIGINS: ${{ secrets.ALLOWED_ORIGINS }}
         run: |
+          echo "📦 Deploying backend code to server..."
+          
+          # Create backup of existing backend if it exists
+          ssh -p $SSH_PORT $SSH_USER@$SSH_HOST "cd $DEPLOY_PATH && [ -d backend ] && mv backend backend.backup.\$(date +%Y%m%d_%H%M%S) || true"
+          
+          # Create backend directory structure
+          ssh -p $SSH_PORT $SSH_USER@$SSH_HOST "mkdir -p $DEPLOY_PATH/backend"
+          
+          # Copy backend code to server using tar (more reliable than rsync)
+          # Create a tar archive excluding unnecessary files
+          tar --exclude='__pycache__' \
+              --exclude='*.pyc' \
+              --exclude='.pytest_cache' \
+              --exclude='.env' \
+              --exclude='uploads' \
+              --exclude='*.log' \
+              --exclude='test.db' \
+              --exclude='pip-audit-report.json' \
+              --exclude='bandit-report.json' \
+              -czf - -C backend . | \
+          ssh -p $SSH_PORT $SSH_USER@$SSH_HOST "cd $DEPLOY_PATH && tar -xzf - -C backend"
+          
+          # Create uploads directory if it doesn't exist
+          ssh -p $SSH_PORT $SSH_USER@$SSH_HOST "mkdir -p $DEPLOY_PATH/backend/uploads"
+          
+          echo "✅ Backend code deployed"
+          
+          # Setup and deploy on server
           ssh -p $SSH_PORT $SSH_USER@$SSH_HOST bash << REMOTE_EOF
             set -e
             cd $DEPLOY_PATH
-            
-            echo "🔄 Pulling latest changes..."
-            git fetch origin
-            git reset --hard origin/main
             
             echo "📝 Creating/updating backend .env file..."
             cat > backend/.env << ENVEOF
@@ -232,7 +256,6 @@ jobs:
             sleep 5
             
             echo "✅ Backend deployment completed!"
-            
           REMOTE_EOF
 
       - name: Deploy frontend build to server
