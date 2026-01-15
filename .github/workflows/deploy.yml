@@ -15,6 +15,21 @@ jobs:
     name: Lint and Test
     runs-on: ubuntu-latest
     
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: mukit
+          POSTGRES_PASSWORD: mukit
+          POSTGRES_DB: mukit_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -83,10 +98,23 @@ jobs:
           npm run type-check || exit 1
 
       # Backend tests
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Wait for PostgreSQL to be ready
+        run: |
+          until pg_isready -h localhost -p 5432 -U mukit; do
+            echo "Waiting for PostgreSQL to be ready..."
+            sleep 2
+          done
+          echo "PostgreSQL is ready!"
+
       - name: Run backend tests
         working-directory: ./backend
         env:
-          DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:5432/test_db
+          DATABASE_URL: postgresql+asyncpg://mukit:mukit@localhost:5432/mukit_test
         run: |
           python -m pytest tests/ -v --tb=short || exit 1
 
