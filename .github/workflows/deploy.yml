@@ -253,7 +253,6 @@ jobs:
             
             echo "🗄️  Running database migrations..."
             cd backend
-            source ../venv/bin/activate
             alembic upgrade head
             cd ..
             
