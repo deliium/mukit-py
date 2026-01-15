@@ -237,7 +237,7 @@ jobs:
           ENVEOF
             
             echo "🐍 Setting up Python virtual environment..."
-            if [ ! -d "venv" ]; then
+            if [ ! -d ".venv" ]; then
               python3.12 -m venv .venv
             fi
             source .venv/bin/activate
@@ -272,17 +272,28 @@ jobs:
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: |
           echo "📦 Deploying frontend build to server..."
+          
+          # Verify frontend/dist exists locally
+          if [ ! -d "frontend/dist" ]; then
+            echo "❌ Error: frontend/dist directory not found. Make sure frontend is built first."
+            exit 1
+          fi
+          
+          # Create frontend directory structure on server if it doesn't exist
+          ssh -p $SSH_PORT $SSH_USER@$SSH_HOST "mkdir -p '$DEPLOY_PATH/frontend'"
+          
+          # Verify directory was created
+          ssh -p $SSH_PORT $SSH_USER@$SSH_HOST "test -d '$DEPLOY_PATH/frontend' || { echo 'Failed to create frontend directory'; exit 1; }"
+          
           # Create backup of existing dist if it exists
-          ssh -p $SSH_PORT $SSH_USER@$SSH_HOST "cd $DEPLOY_PATH/frontend && [ -d dist ] && mv dist dist.backup.\$(date +%Y%m%d_%H%M%S) || true"
+          ssh -p $SSH_PORT $SSH_USER@$SSH_HOST "cd '$DEPLOY_PATH/frontend' && [ -d dist ] && mv dist dist.backup.\$(date +%Y%m%d_%H%M%S) || true"
           
           # Copy dist directory to server
-          scp -P $SSH_PORT -r frontend/dist $SSH_USER@$SSH_HOST:$DEPLOY_PATH/frontend/
+          echo "Copying frontend/dist to server..."
+          scp -P $SSH_PORT -r frontend/dist $SSH_USER@$SSH_HOST:'$DEPLOY_PATH/frontend/'
           
-          # Set proper permissions
-          ssh -p $SSH_PORT $SSH_USER@$SSH_HOST "sudo chown -R www-data:www-data $DEPLOY_PATH/frontend/dist || true"
-          
-          # Reload nginx to serve new static files
-          ssh -p $SSH_PORT $SSH_USER@$SSH_HOST "sudo systemctl reload nginx || echo '⚠️  nginx not configured, skipping reload'"
+          # Verify copy was successful
+          ssh -p $SSH_PORT $SSH_USER@$SSH_HOST "test -d '$DEPLOY_PATH/frontend/dist' || { echo 'Failed to copy frontend/dist'; exit 1; }"
           
           echo "✅ Frontend build deployed successfully"
 
