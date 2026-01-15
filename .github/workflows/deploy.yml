@@ -238,11 +238,18 @@ jobs:
             
             echo "🐍 Setting up Python virtual environment..."
             if [ ! -d "venv" ]; then
-              python3 -m venv venv
+              python3.12 -m venv .venv
             fi
-            source venv/bin/activate
-            pip install --upgrade pip
-            pip install -r backend/requirements.txt
+            source .venv/bin/activate
+            
+            echo "📦 Upgrading pip, setuptools, and wheel..."
+            pip install --upgrade pip setuptools wheel
+            
+            echo "📦 Installing Python dependencies..."
+            pip install --no-cache-dir --index-url https://pypi.org/simple/ -r backend/requirements.txt || {
+              echo "❌ Failed to install dependencies. Trying without explicit index..."
+              pip install --no-cache-dir -r backend/requirements.txt
+            }
             
             echo "🗄️  Running database migrations..."
             cd backend
