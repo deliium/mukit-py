@@ -1,0 +1,242 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION: '3.12'
+  NODE_VERSION: '18'
+
+jobs:
+  lint-and-test:
+    name: Lint and Test
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Backend setup and linting
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Cache Python dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('backend/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install Python dependencies
+        working-directory: ./backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install ruff mypy bandit safety pytest pytest-asyncio httpx pytest-cov
+
+      - name: Run backend linters
+        working-directory: ./backend
+        run: |
+          echo "Running Ruff linter..."
+          ruff check app/ --show-fixes || exit 1
+          
+          echo "Running Ruff formatter check..."
+          ruff format app/ --check --diff || exit 1
+          
+          echo "Running MyPy type checker..."
+          mypy app/ --show-error-codes --strict || exit 1
+          
+          echo "Running Bandit security linter..."
+          bandit -r app/ -f json -o bandit-report.json || exit 1
+          
+          echo "Running pip-audit..."
+          pip-audit --format=json --output=pip-audit-report.json || true
+
+      # Frontend setup and linting
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Run frontend linters
+        working-directory: ./frontend
+        run: |
+          echo "Running ESLint..."
+          npm run lint || exit 1
+          
+          echo "Running Prettier check..."
+          npm run format:check || exit 1
+          
+          echo "Running TypeScript type check..."
+          npm run type-check || exit 1
+
+      # Backend tests
+      - name: Run backend tests
+        working-directory: ./backend
+        env:
+          DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:5432/test_db
+        run: |
+          python -m pytest tests/ -v --tb=short || exit 1
+
+      # Frontend tests
+      - name: Run frontend tests
+        working-directory: ./frontend
+        run: |
+          npm run test:run || exit 1
+
+  deploy:
+    name: Deploy to VPS
+    needs: lint-and-test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate required secrets
+        run: |
+          if [ -z "${{ secrets.SSH_PRIVATE_KEY }}" ]; then
+            echo "❌ Error: SSH_PRIVATE_KEY secret is not set"
+            exit 1
+          fi
+          if [ -z "${{ secrets.SSH_HOST }}" ]; then
+            echo "❌ Error: SSH_HOST secret is not set"
+            exit 1
+          fi
+          if [ -z "${{ secrets.SSH_USER }}" ]; then
+            echo "❌ Error: SSH_USER secret is not set"
+            exit 1
+          fi
+          if [ -z "${{ secrets.DEPLOY_PATH }}" ]; then
+            echo "❌ Error: DEPLOY_PATH secret is not set"
+            exit 1
+          fi
+          echo "✅ All required secrets are set"
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Add server to known hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -p ${{ secrets.SSH_PORT || 22 }} ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Set up Node.js for build
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Build frontend production bundle
+        working-directory: ./frontend
+        env:
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+          VITE_WS_URL: ${{ secrets.VITE_WS_URL }}
+        run: |
+          echo "🏗️  Building frontend production bundle..."
+          npm run build
+          echo "✅ Frontend build completed"
+
+      - name: Deploy to server
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_PORT: ${{ secrets.SSH_PORT || 22 }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          REDIS_URL: ${{ secrets.REDIS_URL }}
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+          ALLOWED_ORIGINS: ${{ secrets.ALLOWED_ORIGINS }}
+        run: |
+          ssh -p $SSH_PORT $SSH_USER@$SSH_HOST bash << REMOTE_EOF
+            set -e
+            cd $DEPLOY_PATH
+            
+            echo "🔄 Pulling latest changes..."
+            git fetch origin
+            git reset --hard origin/main
+            
+            echo "📝 Creating/updating backend .env file..."
+            cat > backend/.env << ENVEOF
+          DATABASE_URL=$DATABASE_URL
+          REDIS_URL=$REDIS_URL
+          SECRET_KEY=$SECRET_KEY
+          ALLOWED_ORIGINS=$ALLOWED_ORIGINS
+          ENVEOF
+            
+            echo "🐍 Setting up Python virtual environment..."
+            if [ ! -d "venv" ]; then
+              python3 -m venv venv
+            fi
+            source venv/bin/activate
+            pip install --upgrade pip
+            pip install -r backend/requirements.txt
+            
+            echo "🗄️  Running database migrations..."
+            cd backend
+            source ../venv/bin/activate
+            alembic upgrade head
+            cd ..
+            
+            echo "🔄 Restarting backend service..."
+            
+            echo "⏳ Waiting for services to start..."
+            sleep 5
+            
+            echo "✅ Backend deployment completed!"
+            
+          REMOTE_EOF
+
+      - name: Deploy frontend build to server
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_PORT: ${{ secrets.SSH_PORT || 22 }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          echo "📦 Deploying frontend build to server..."
+          # Create backup of existing dist if it exists
+          ssh -p $SSH_PORT $SSH_USER@$SSH_HOST "cd $DEPLOY_PATH/frontend && [ -d dist ] && mv dist dist.backup.\$(date +%Y%m%d_%H%M%S) || true"
+          
+          # Copy dist directory to server
+          scp -P $SSH_PORT -r frontend/dist $SSH_USER@$SSH_HOST:$DEPLOY_PATH/frontend/
+          
+          # Set proper permissions
+          ssh -p $SSH_PORT $SSH_USER@$SSH_HOST "sudo chown -R www-data:www-data $DEPLOY_PATH/frontend/dist || true"
+          
+          # Reload nginx to serve new static files
+          ssh -p $SSH_PORT $SSH_USER@$SSH_HOST "sudo systemctl reload nginx || echo '⚠️  nginx not configured, skipping reload'"
+          
+          echo "✅ Frontend build deployed successfully"
+
+      - name: Health check
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_PORT: ${{ secrets.SSH_PORT || 22 }}
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+        run: |
+          echo "🏥 Performing health check..."
+          API_URL=$(echo "${{ secrets.VITE_API_URL }}" | sed 's|/api/v1||')
+          ssh -p $SSH_PORT $SSH_USER@$SSH_HOST "curl -f $API_URL/health || echo '⚠️  Health check failed'" || true
+

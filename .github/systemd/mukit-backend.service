@@ -1,0 +1,25 @@
+[Unit]
+Description=Mukit Backend API Service
+After=network.target postgresql.service
+Requires=postgresql.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/mukit-py/backend
+Environment="PATH=/var/www/mukit-py/venv/bin:/usr/local/bin:/usr/bin:/bin"
+EnvironmentFile=/var/www/mukit-py/backend/.env
+# Use INSTANCE_HOST and PORT for port mode, or SOCKET for socket mode
+# Example for port: INSTANCE_HOST=0.0.0.0 PORT=8888
+# Example for socket: SOCKET=/var/run/mukit-backend.sock
+ExecStart=/var/www/mukit-py/venv/bin/python server.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mukit-backend
+
+[Install]
+WantedBy=multi-user.target
+

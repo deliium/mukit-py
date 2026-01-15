@@ -35,11 +35,13 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8888:8888"
+    env_file:
+      - .env
     environment:
-      DATABASE_URL: postgresql+asyncpg://mukit_user:mukit_password@db:5432/mukit_db
-      REDIS_URL: redis://redis:6379/0
-      SECRET_KEY: your-secret-key-change-in-production
-      ALLOWED_ORIGINS: http://localhost:3333,http://localhost:5173
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://mukit_user:mukit_password@db:5432/mukit_db}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      SECRET_KEY: ${SECRET_KEY:-your-secret-key-change-in-production}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3333,http://localhost:5173}
     depends_on:
       db:
         condition: service_healthy
@@ -59,9 +61,11 @@ services:
       dockerfile: Dockerfile
     ports:
       - "3333:3333"
+    env_file:
+      - .env
     environment:
-      VITE_API_URL: http://localhost:8888/api/v1
-      VITE_WS_URL: ws://localhost:8888
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:8888/api/v1}
+      VITE_WS_URL: ${VITE_WS_URL:-ws://localhost:8888}
     depends_on:
       - backend
     volumes:

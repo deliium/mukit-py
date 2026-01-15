@@ -1,0 +1,25 @@
+[Unit]
+Description=Mukit Frontend Server
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/mukit-py/frontend
+Environment="PATH=/usr/bin:/usr/local/bin"
+Environment="NODE_ENV=production"
+# For port mode: INSTANCE_HOST=0.0.0.0 PORT=3333
+# For socket mode: SOCKET=/var/run/mukit-frontend.sock
+# Optional: STATIC_DIR=/var/www/mukit-py/frontend/dist
+# Optional: INDEX_PATH=/var/www/mukit-py/frontend/dist/index.html
+ExecStart=/usr/bin/node server.js
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mukit-frontend
+
+[Install]
+WantedBy=multi-user.target
+
