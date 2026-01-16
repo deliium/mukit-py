@@ -7,7 +7,9 @@ const API_BASE_URL =
 console.log('🔗 API Base URL:', API_BASE_URL);
 if (!import.meta.env.VITE_API_URL) {
   console.warn('⚠️  VITE_API_URL is not set! Using default:', API_BASE_URL);
-  console.warn('⚠️  Make sure VITE_API_URL is set in GitHub Secrets during build!');
+  console.warn(
+    '⚠️  Make sure VITE_API_URL is set in GitHub Secrets during build!'
+  );
 }
 
 export const api = axios.create({
