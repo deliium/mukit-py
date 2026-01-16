@@ -244,15 +244,13 @@ jobs:
             pip install --upgrade pip setuptools wheel
             
             echo "📦 Installing Python dependencies..."
-            pip install --no-cache-dir --index-url https://pypi.org/simple/ -r backend/requirements.txt || {
+            pip install --no-cache-dir --index-url https://pypi.org/simple/ -r requirements.txt || {
               echo "❌ Failed to install dependencies. Trying without explicit index..."
-              pip install --no-cache-dir -r backend/requirements.txt
+              pip install --no-cache-dir -r requirements.txt
             }
             
             echo "🗄️  Running database migrations..."
-            cd backend
             alembic upgrade head
-            cd ..
             
             echo "🔄 Restarting backend service..."
             
