@@ -198,9 +198,6 @@ jobs:
         run: |
           echo "📦 Deploying backend code to server..."
           
-          # Create backup of existing backend if it exists
-          ssh -p $SSH_PORT $SSH_USER@$SSH_HOST "cd $DEPLOY_PATH && [ -d backend ] && mv backend backend.backup.\$(date +%Y%m%d_%H%M%S) || true"
-          
           # Create backend directory structure
           ssh -p $SSH_PORT $SSH_USER@$SSH_HOST "mkdir -p $DEPLOY_PATH/backend"
           
@@ -285,15 +282,12 @@ jobs:
           # Verify directory was created
           ssh -p $SSH_PORT $SSH_USER@$SSH_HOST "test -d '$DEPLOY_PATH/frontend' || { echo 'Failed to create frontend directory'; exit 1; }"
           
-          # Create backup of existing dist if it exists
-          ssh -p $SSH_PORT $SSH_USER@$SSH_HOST "cd '$DEPLOY_PATH/frontend' && [ -d dist ] && mv dist dist.backup.\$(date +%Y%m%d_%H%M%S) || true"
-          
           # Copy dist directory to server
           echo "Copying frontend/dist to server..."
-          scp -P $SSH_PORT -r frontend/dist $SSH_USER@$SSH_HOST:'$DEPLOY_PATH/frontend/'
+          scp -P $SSH_PORT -r frontend/dist/* $SSH_USER@$SSH_HOST:'$DEPLOY_PATH/frontend/'
           
           # Verify copy was successful
-          ssh -p $SSH_PORT $SSH_USER@$SSH_HOST "test -d '$DEPLOY_PATH/frontend/dist' || { echo 'Failed to copy frontend/dist'; exit 1; }"
+          ssh -p $SSH_PORT $SSH_USER@$SSH_HOST "test -d '$DEPLOY_PATH/frontend' || { echo 'Failed to copy frontend'; exit 1; }"
           
           echo "✅ Frontend build deployed successfully"
 
