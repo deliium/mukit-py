@@ -98,7 +98,7 @@ if ("SOCKET" in process.env) {
     fs.unlinkSync(socket);
   }
   server.listen(socket, () => {
-    fs.chmodSync(socket, 0o660);
+    fs.chmodSync(socket, 0o666);
     console.log(`Listening ${socket}`);
   });
 } else if ("PORT" in process.env) {
