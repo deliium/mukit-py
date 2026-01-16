@@ -233,6 +233,7 @@ jobs:
           ALLOWED_ORIGINS=$ALLOWED_ORIGINS
           ENVEOF
             
+            cd backend 
             echo "🐍 Setting up Python virtual environment..."
             if [ ! -d ".venv" ]; then
               python3.12 -m venv .venv
