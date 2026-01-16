@@ -282,12 +282,13 @@ jobs:
           # Verify directory was created
           ssh -p $SSH_PORT $SSH_USER@$SSH_HOST "test -d '$DEPLOY_PATH/frontend' || { echo 'Failed to create frontend directory'; exit 1; }"
           
-          # Copy dist directory to server
+          # Copy dist directory to server using tar (more reliable than scp for directories)
           echo "Copying frontend/dist to server..."
-          scp -P $SSH_PORT -r frontend/dist/* $SSH_USER@$SSH_HOST:'$DEPLOY_PATH/frontend/'
+          tar -czf - -C frontend dist | \
+          ssh -p $SSH_PORT $SSH_USER@$SSH_HOST "cd '$DEPLOY_PATH/frontend' && tar -xzf -"
           
           # Verify copy was successful
-          ssh -p $SSH_PORT $SSH_USER@$SSH_HOST "test -d '$DEPLOY_PATH/frontend' || { echo 'Failed to copy frontend'; exit 1; }"
+          ssh -p $SSH_PORT $SSH_USER@$SSH_HOST "test -d '$DEPLOY_PATH/frontend/dist' || { echo 'Failed to copy frontend/dist'; exit 1; }"
           
           echo "✅ Frontend build deployed successfully"
 
