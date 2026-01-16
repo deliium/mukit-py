@@ -296,24 +296,9 @@ jobs:
             export VITE_API_URL="${{ secrets.VITE_API_URL }}"
             export VITE_WS_URL="${{ secrets.VITE_WS_URL }}"
             
-            echo "📝 Creating frontend .env file..."
-            # Use socket mode - default socket path for this hosting provider
-            # You can override this by setting FRONTEND_SOCKET in GitHub Secrets
-            if [ -n "${{ secrets.FRONTEND_SOCKET }}" ]; then
-              SOCKET_PATH="${{ secrets.FRONTEND_SOCKET }}"
-            else
-              SOCKET_PATH="/var/www/uludupec/data/nodejs/4.sock"
-            fi
-            
-            # Ensure socket directory exists with proper permissions
-            SOCKET_DIR="\$(dirname "\$SOCKET_PATH")"
-            mkdir -p "\$SOCKET_DIR"
-            chmod 755 "\$SOCKET_DIR" || true
-            
             cat > .env << ENVEOF
           VITE_API_URL=${{ secrets.VITE_API_URL }}
           VITE_WS_URL=${{ secrets.VITE_WS_URL }}
-          SOCKET=\$SOCKET_PATH
           ENVEOF
             
             echo "📝 Frontend will use socket: \$SOCKET_PATH"
