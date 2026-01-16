@@ -164,26 +164,18 @@ jobs:
           mkdir -p ~/.ssh
           ssh-keyscan -p ${{ secrets.SSH_PORT || 22 }} ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
 
-      - name: Set up Node.js for build
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Install frontend dependencies
-        working-directory: ./frontend
-        run: npm ci
-
-      - name: Build frontend production bundle
-        working-directory: ./frontend
-        env:
-          VITE_API_URL: ${{ secrets.VITE_API_URL }}
-          VITE_WS_URL: ${{ secrets.VITE_WS_URL }}
+      - name: Verify frontend environment variables
         run: |
-          echo "🏗️  Building frontend production bundle..."
-          npm run build
-          echo "✅ Frontend build completed"
+          echo "📝 Checking frontend environment variables..."
+          if [ -z "${{ secrets.VITE_API_URL }}" ]; then
+            echo "❌ Error: VITE_API_URL secret is not set"
+            exit 1
+          fi
+          if [ -z "${{ secrets.VITE_WS_URL }}" ]; then
+            echo "❌ Error: VITE_WS_URL secret is not set"
+            exit 1
+          fi
+          echo "✅ Frontend environment variables are set"
 
       - name: Deploy backend to server
         env:
@@ -260,20 +252,14 @@ jobs:
             echo "✅ Backend deployment completed!"
           REMOTE_EOF
 
-      - name: Deploy frontend build to server
+      - name: Deploy frontend source code to server
         env:
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_USER: ${{ secrets.SSH_USER }}
           SSH_PORT: ${{ secrets.SSH_PORT || 22 }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: |
-          echo "📦 Deploying frontend build to server..."
-          
-          # Verify frontend/dist exists locally
-          if [ ! -d "frontend/dist" ]; then
-            echo "❌ Error: frontend/dist directory not found. Make sure frontend is built first."
-            exit 1
-          fi
+          echo "📦 Deploying frontend source code to server..."
           
           # Create frontend directory structure on server if it doesn't exist
           ssh -p $SSH_PORT $SSH_USER@$SSH_HOST "mkdir -p '$DEPLOY_PATH/frontend'"
@@ -281,15 +267,52 @@ jobs:
           # Verify directory was created
           ssh -p $SSH_PORT $SSH_USER@$SSH_HOST "test -d '$DEPLOY_PATH/frontend' || { echo 'Failed to create frontend directory'; exit 1; }"
           
-          # Copy contents of dist directory to server using tar (more reliable than scp for directories)
-          echo "Copying frontend/dist contents to server..."
-          tar -czf - -C frontend/dist . | \
+          # Copy frontend source code to server using tar (excluding node_modules, dist, etc.)
+          echo "Copying frontend source code to server..."
+          tar --exclude='node_modules' \
+              --exclude='dist' \
+              --exclude='.git' \
+              --exclude='.vite' \
+              --exclude='coverage' \
+              --exclude='*.log' \
+              -czf - -C frontend . | \
           ssh -p $SSH_PORT $SSH_USER@$SSH_HOST "cd '$DEPLOY_PATH/frontend' && tar -xzf -"
           
-          # Verify copy was successful (check for index.html or any dist file)
-          ssh -p $SSH_PORT $SSH_USER@$SSH_HOST "test -f '$DEPLOY_PATH/frontend/index.html' || { echo 'Failed to copy frontend files'; exit 1; }"
+          # Verify copy was successful
+          ssh -p $SSH_PORT $SSH_USER@$SSH_HOST "test -f '$DEPLOY_PATH/frontend/package.json' || { echo 'Failed to copy frontend source'; exit 1; }"
           
-          echo "✅ Frontend build deployed successfully"
+          echo "✅ Frontend source code deployed"
+          
+          # Build and setup frontend on server
+          ssh -p $SSH_PORT $SSH_USER@$SSH_HOST bash << REMOTE_EOF
+            set -e
+            cd $DEPLOY_PATH/frontend
+            
+            echo "📝 Setting up frontend environment variables..."
+            export VITE_API_URL="${{ secrets.VITE_API_URL }}"
+            export VITE_WS_URL="${{ secrets.VITE_WS_URL }}"
+            
+            echo "📝 Creating frontend .env file..."
+            cat > .env << ENVEOF
+          VITE_API_URL=${{ secrets.VITE_API_URL }}
+          VITE_WS_URL=${{ secrets.VITE_WS_URL }}
+          INSTANCE_HOST=0.0.0.0
+          PORT=3333
+          ENVEOF
+            
+            echo "📦 Installing Node.js dependencies..."
+            /var/www/uludupec/data/.nvm/versions/node/v24.13.0/bin/npm ci
+            
+            echo "🏗️  Building frontend production bundle..."
+            /var/www/uludupec/data/.nvm/versions/node/v24.13.0/bin/npm run build
+            
+            echo "✅ Frontend build completed on server"
+          REMOTE_EOF
+          
+          echo "✅ Frontend deployment completed successfully"
+          
+          # Restart frontend service if it exists
+          echo "🔄 Restarting frontend service..."
 
       - name: Health check
         env:
