@@ -288,6 +288,10 @@ jobs:
             set -e
             cd $DEPLOY_PATH/frontend
             
+            # Set up Node.js paths - npm needs node in PATH
+            export NODE_PATH="/var/www/uludupec/data/.nvm/versions/node/v24.13.0"
+            export PATH="\$NODE_PATH/bin:\$PATH"
+            
             echo "📝 Setting up frontend environment variables..."
             export VITE_API_URL="${{ secrets.VITE_API_URL }}"
             export VITE_WS_URL="${{ secrets.VITE_WS_URL }}"
@@ -301,10 +305,7 @@ jobs:
           ENVEOF
             
             echo "📦 Installing Node.js dependencies..."
-            /var/www/uludupec/data/.nvm/versions/node/v24.13.0/bin/npm ci
-            
-            echo "🏗️  Building frontend production bundle..."
-            /var/www/uludupec/data/.nvm/versions/node/v24.13.0/bin/npm run build
+            npm ci
             
             echo "✅ Frontend build completed on server"
           REMOTE_EOF
