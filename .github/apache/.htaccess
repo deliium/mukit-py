@@ -1,31 +1,18 @@
 # Apache configuration for Mukit
 # This file should be placed in the frontend directory or document root
-# Requires: mod_rewrite, mod_proxy, mod_proxy_http, mod_headers
-# Optional for WebSocket: mod_proxy_wstunnel (for better WebSocket support)
+# Requires: mod_rewrite, mod_headers
+# 
+# NOTE: Backend API proxying (/api and /ws) should be configured at the Apache
+# virtual host level, not in .htaccess. This file only handles:
+# - SPA routing (serving index.html for non-file requests)
+# - Security headers
+# - Cache headers for static assets
 
 # Enable rewrite engine
 RewriteEngine On
 
-# Backend API proxy - proxy /api requests to backend
-# The [P] flag enables proxy pass, [L] stops further rule processing
-RewriteCond %{REQUEST_URI} ^/api
-RewriteRule ^api/(.*)$ http://localhost:8888/api/$1 [P,L]
-
-# WebSocket proxy - proxy /ws requests to backend
-# Note: For better WebSocket support, use mod_proxy_wstunnel in Apache config
-# For now, this uses standard HTTP proxy which should work for most cases
-RewriteCond %{REQUEST_URI} ^/ws
-RewriteRule ^ws/(.*)$ http://localhost:8888/ws/$1 [P,L]
-
-# Proxy headers for backend
-<IfModule mod_headers.c>
-    # Forward original headers to backend
-    RequestHeader set X-Forwarded-Proto "https" env=HTTPS
-    RequestHeader set X-Forwarded-For "%{REMOTE_ADDR}e" env=REMOTE_ADDR
-</IfModule>
-
 # SPA routing - serve index.html for all non-file requests
-# This should come AFTER the API/WebSocket proxy rules
+# Exclude /api and /ws paths (these are handled by Apache virtual host proxy configuration)
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteCond %{REQUEST_URI} !^/api
