@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.api.v1.api import api_router
+from app.core.config import settings
 from app.core.database import init_db
 
 
@@ -25,15 +26,11 @@ app = FastAPI(
 )
 
 # CORS middleware
+# Log allowed origins for debugging
+print(f"🔒 CORS allowed origins: {settings.ALLOWED_ORIGINS}")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3333",
-        "http://127.0.0.1:3333",
-        "http://localhost:5173",
-        "http://localhost:8888",
-        "http://127.0.0.1:8888",
-    ],
+    allow_origins=settings.ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
