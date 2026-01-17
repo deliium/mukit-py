@@ -23,6 +23,7 @@ app = FastAPI(
     description="A scalable document collaboration platform",
     version="1.0.0",
     lifespan=lifespan,
+    redirect_slashes=False,  # Disable automatic trailing slash redirects to prevent 307 errors
 )
 
 # CORS middleware
