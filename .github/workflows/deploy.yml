@@ -283,6 +283,12 @@ jobs:
           
           echo "✅ Frontend source code deployed"
           
+          # Copy .htaccess file for Apache configuration (if using Apache)
+          echo "📝 Copying Apache .htaccess configuration..."
+          scp -P $SSH_PORT .github/apache/.htaccess $SSH_USER@$SSH_HOST:$DEPLOY_PATH/frontend/.htaccess || {
+            echo "⚠️  Warning: Failed to copy .htaccess file (this is OK if not using Apache)"
+          }
+          
           # Build and setup frontend on server
           ssh -p $SSH_PORT $SSH_USER@$SSH_HOST bash << REMOTE_EOF
             set -e

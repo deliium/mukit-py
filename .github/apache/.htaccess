@@ -1,0 +1,57 @@
+# Apache configuration for Mukit
+# This file should be placed in the frontend directory or document root
+# Requires: mod_rewrite, mod_proxy, mod_proxy_http, mod_headers
+# Optional for WebSocket: mod_proxy_wstunnel (for better WebSocket support)
+
+# Enable rewrite engine
+RewriteEngine On
+
+# Backend API proxy - proxy /api requests to backend
+# The [P] flag enables proxy pass, [L] stops further rule processing
+RewriteCond %{REQUEST_URI} ^/api
+RewriteRule ^api/(.*)$ http://localhost:8888/api/$1 [P,L]
+
+# WebSocket proxy - proxy /ws requests to backend
+# Note: For better WebSocket support, use mod_proxy_wstunnel in Apache config
+# For now, this uses standard HTTP proxy which should work for most cases
+RewriteCond %{REQUEST_URI} ^/ws
+RewriteRule ^ws/(.*)$ http://localhost:8888/ws/$1 [P,L]
+
+# Proxy headers for backend
+<IfModule mod_headers.c>
+    # Forward original headers to backend
+    RequestHeader set X-Forwarded-Proto "https" env=HTTPS
+    RequestHeader set X-Forwarded-For "%{REMOTE_ADDR}e" env=REMOTE_ADDR
+</IfModule>
+
+# SPA routing - serve index.html for all non-file requests
+# This should come AFTER the API/WebSocket proxy rules
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_URI} !^/api
+RewriteCond %{REQUEST_URI} !^/ws
+RewriteRule ^ index.html [L]
+
+# Security headers
+<IfModule mod_headers.c>
+    # Security headers (CORS is handled by backend)
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set X-XSS-Protection "1; mode=block"
+</IfModule>
+
+# Cache static assets
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType text/css "access plus 1 year"
+    ExpiresByType application/javascript "access plus 1 year"
+    ExpiresByType image/png "access plus 1 year"
+    ExpiresByType image/jpg "access plus 1 year"
+    ExpiresByType image/jpeg "access plus 1 year"
+    ExpiresByType image/gif "access plus 1 year"
+    ExpiresByType image/svg+xml "access plus 1 year"
+    ExpiresByType image/x-icon "access plus 1 year"
+    ExpiresByType font/woff "access plus 1 year"
+    ExpiresByType font/woff2 "access plus 1 year"
+    ExpiresByType font/ttf "access plus 1 year"
+</IfModule>
