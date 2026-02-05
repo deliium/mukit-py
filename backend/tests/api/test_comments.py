@@ -117,7 +117,7 @@ async def test_create_comment(
     }
 
     response = await client.post(
-        "/api/v1/comments/",
+        "/api/v1/comments",
         json=comment_data,
         headers=auth_headers,
     )
@@ -223,7 +223,7 @@ async def test_create_reply(
     }
 
     response = await client.post(
-        "/api/v1/comments/",
+        "/api/v1/comments",
         json=reply_data,
         headers=auth_headers,
     )

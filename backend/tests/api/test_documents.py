@@ -20,7 +20,7 @@ async def test_create_document(
     }
 
     response = await client.post(
-        "/api/v1/documents/",
+        "/api/v1/documents",
         json=document_data,
         headers=auth_headers,
     )
@@ -40,7 +40,7 @@ async def test_get_documents(
     client: httpx.AsyncClient, auth_headers: dict[str, str], test_document
 ):
     """Test getting documents."""
-    response = await client.get("/api/v1/documents/", headers=auth_headers)
+    response = await client.get("/api/v1/documents", headers=auth_headers)
 
     assert response.status_code == 200
     data = response.json()
@@ -134,7 +134,7 @@ async def test_create_document_unauthorized(client: httpx.AsyncClient, test_work
         "is_public": False,
     }
 
-    response = await client.post("/api/v1/documents/", json=document_data)
+    response = await client.post("/api/v1/documents", json=document_data)
 
     assert response.status_code == 403
 

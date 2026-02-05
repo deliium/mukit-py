@@ -286,7 +286,7 @@ describe('Document Page - Comment Functionality', () => {
       if (url.includes('/comments/threads')) {
         return Promise.resolve({ data: mockThread });
       }
-      if (url.includes('/comments/')) {
+      if (url === '/comments' || url === '/comments/') {
         return Promise.resolve({ data: mockComment });
       }
       return Promise.resolve({ data: {} });
@@ -365,7 +365,7 @@ describe('Document Page - Comment Functionality', () => {
 
     // Then create comment
     const commentCall = mockApiPost.mock.calls.find(
-      (call: any[]) => call[0] === '/comments/'
+      (call: any[]) => call[0] === '/comments'
     );
     expect(commentCall).toBeDefined();
     expect(commentCall?.[1]).toMatchObject({

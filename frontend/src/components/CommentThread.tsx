@@ -35,7 +35,7 @@ const CommentThreadComponent: React.FC<CommentThreadProps> = ({
 
     try {
       setSubmittingReply(true);
-      await api.post('/comments/', {
+      await api.post('/comments', {
         thread_id: thread.id,
         content: replyContent.trim(),
         parent_id: parentId || null,

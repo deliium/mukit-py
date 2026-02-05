@@ -12,7 +12,7 @@ from app.services.workspace_service import WorkspaceService
 router = APIRouter()
 
 
-@router.post("/", response_model=Workspace)
+@router.post("", response_model=Workspace)
 async def create_workspace(
     workspace: WorkspaceCreate,
     current_user: User = Depends(get_current_active_user),
@@ -28,7 +28,7 @@ async def create_workspace(
     return await workspace_service.create_workspace(dto, current_user.id)
 
 
-@router.get("/", response_model=list[Workspace])
+@router.get("", response_model=list[Workspace])
 async def get_workspaces(
     current_user: User = Depends(get_current_active_user),
     workspace_service: WorkspaceService = Depends(get_workspace_service),

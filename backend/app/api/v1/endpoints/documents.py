@@ -17,7 +17,7 @@ from app.services.dto import CreateDocumentDTO, DocumentFilterDTO, UpdateDocumen
 router = APIRouter()
 
 
-@router.post("/", response_model=Document)
+@router.post("", response_model=Document)
 async def create_document(
     document: DocumentCreate,
     current_user: User = Depends(get_current_active_user),
@@ -36,7 +36,7 @@ async def create_document(
     return await document_service.create_document(dto, current_user.id)
 
 
-@router.get("/", response_model=list[Document])
+@router.get("", response_model=list[Document])
 async def get_documents(
     workspace_id: uuid.UUID | None = None,
     current_user: User = Depends(get_current_active_user),

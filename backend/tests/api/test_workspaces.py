@@ -5,6 +5,19 @@ import pytest
 
 
 @pytest.mark.asyncio
+async def test_collection_paths_no_trailing_slash(
+    client: httpx.AsyncClient, auth_headers: dict[str, str]
+):
+    """Collection endpoints use no trailing slash (GET/POST /api/v1/workspaces)."""
+    # No trailing slash: 200
+    r = await client.get("/api/v1/workspaces", headers=auth_headers)
+    assert r.status_code == 200
+    # With trailing slash: 404 (redirect_slashes=False)
+    r_slash = await client.get("/api/v1/workspaces/", headers=auth_headers)
+    assert r_slash.status_code == 404
+
+
+@pytest.mark.asyncio
 async def test_create_workspace(
     client: httpx.AsyncClient, auth_headers: dict[str, str]
 ):
@@ -16,7 +29,7 @@ async def test_create_workspace(
     }
 
     response = await client.post(
-        "/api/v1/workspaces/",
+        "/api/v1/workspaces",
         json=workspace_data,
         headers=auth_headers,
     )
@@ -34,7 +47,7 @@ async def test_get_workspaces(
     client: httpx.AsyncClient, auth_headers: dict[str, str], test_workspace
 ):
     """Test getting workspaces."""
-    response = await client.get("/api/v1/workspaces/", headers=auth_headers)
+    response = await client.get("/api/v1/workspaces", headers=auth_headers)
 
     assert response.status_code == 200
     data = response.json()
@@ -97,6 +110,6 @@ async def test_create_workspace_unauthorized(client: httpx.AsyncClient):
         "slug": "new-workspace",
     }
 
-    response = await client.post("/api/v1/workspaces/", json=workspace_data)
+    response = await client.post("/api/v1/workspaces", json=workspace_data)
 
     assert response.status_code == 403

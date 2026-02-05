@@ -144,7 +144,7 @@ const CommentPanel = forwardRef<CommentPanelRef, CommentPanelProps>(
         });
 
         // Create first comment in the thread
-        await api.post('/comments/', {
+        await api.post('/comments', {
           thread_id: response.data.id,
           content: newThreadContent.trim(),
         });

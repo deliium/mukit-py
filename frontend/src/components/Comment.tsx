@@ -69,7 +69,7 @@ const CommentComponent: React.FC<CommentProps> = ({
 
     try {
       setSubmitting(true);
-      await api.post('/comments/', {
+      await api.post('/comments', {
         thread_id: comment.thread_id,
         content: replyContent.trim(),
         parent_id: comment.id,

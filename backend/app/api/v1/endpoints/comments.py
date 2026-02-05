@@ -75,7 +75,7 @@ async def delete_thread(
     return {"message": "Thread deleted successfully"}
 
 
-@router.post("/", response_model=CommentReadModel)
+@router.post("", response_model=CommentReadModel)
 async def create_comment(
     comment_data: CreateCommentDTO,
     current_user: User = Depends(get_current_active_user),

@@ -1259,7 +1259,7 @@ const DocumentPage: React.FC = () => {
       });
 
       // Create first comment
-      await api.post('/comments/', {
+      await api.post('/comments', {
         thread_id: threadResponse.data.id,
         content: content.trim(),
       });
